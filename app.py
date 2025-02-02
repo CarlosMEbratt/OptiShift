@@ -202,9 +202,28 @@ def view_job_sites():
 def view_assignments():
     st.header("View Assignments")
 
+    # Fetch assignments from Firestore
     docs = assignments_ref.stream()
+
+    # Prepare data for the table
+    assignments_data = []
     for doc in docs:
-        st.write(f'{doc.id} => {doc.to_dict()}')
+        assignment = doc.to_dict()
+        assignment['assignment_id'] = doc.id  # Include the Firestore document ID
+        assignments_data.append(assignment)
+
+    # Convert data to a DataFrame for better table formatting
+    if assignments_data:
+        df = pd.DataFrame(assignments_data)
+
+        # Reorder columns for better readability (optional)
+        column_order = ['assignment_id', 'employee_id', 'job_site_id', 'assigned_date']
+        df = df[column_order]
+
+        # Display the data in a table format
+        st.dataframe(df)
+    else:
+        st.write("No assignments found.")
 
 if __name__ == '__main__':
     main()

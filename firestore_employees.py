@@ -64,6 +64,10 @@ def generate_random_certifications():
 
 
 # --------------------------------------------------------------------------------------------------------------------
+# Function to clean addresses (removes unit numbers like "Unit 2", "Ste 14")
+def clean_address(address):
+    return re.sub(r'\b(Unit|Ste|Suite|Apt|Apartment|Floor|Rm|Room)\s*\d+\b', '', address, flags=re.IGNORECASE).strip()
+
 # Function to generate random real addresses using Google Places API
 def generate_random_real_address():
     # Example location within GTA (Toronto, Ontario)
@@ -78,8 +82,12 @@ def generate_random_real_address():
             # Pick a random place from the results
             random_place = random.choice(places["results"])
             address = random_place.get("vicinity", "Unknown Address")
-            print(f"Random Address: {address}")
-            return address
+
+            # Clean the address
+            cleaned_address = clean_address(address)
+            
+            print(f"Random Address: {cleaned_address}")
+            return cleaned_address
         else:
             print(f"Error fetching places: {places['status']}")
             return None
@@ -111,21 +119,21 @@ def create_employee():
 
     # Employee data structure (removed 'tenure' and using phone number as string)
     employee_data = {
-        "availability": availability,
-        "certificates": certifications,
+        "availability": availability, # In this format: "7:00-15:30", "22:00-06:00", or both
+        "certificates": certifications, #["WHMIS", "4 Steps", "Forklift", "Boomlift", "Working at Heights", "Scissors Lift"]
         "first_name": first_name,
         "middle_name": middle_name,
         "sur_name": last_name,
         "home_address": home_address,  # Store the random real address here
         "phone_number": phone_number,  # Phone number as a string
         "rating": round(random.uniform(1, 5), 1),  # Random rating between 1 and 5
-        "skills": skills,
-        "role": role,
+        "skills": skills, #["Cleaning", "Labour", "Painter"]
+        "role": role, #["Cleaning", "Labour", "Painter"]
         "worker_id": worker_id
     }
     
     # Add employee to Firestore
-    employees_ref = db.collection('employees2')
+    employees_ref = db.collection('employees')
     employees_ref.add(employee_data)
     print(f"Employee {worker_id} added to Firestore.")
 
