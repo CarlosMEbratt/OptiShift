@@ -3,7 +3,7 @@ import firebase_admin
 import pandas as pd
 from firebase_admin import credentials, firestore, exceptions
 import random
-
+from datetime import datetime
 
 # Initialize Firebase only if not already initialized
 def initialize_firebase():
@@ -69,11 +69,7 @@ def add_employee_form():
 
         st.success(f"Employee {first_name} {sur_name} added with ID: {employee_id}")
 
-
-
 # Streamlit UI for viewing all employees
-from datetime import datetime, timezone
-
 def view_employees():
     st.header("View Employees")
 
@@ -128,47 +124,7 @@ def add_job_site_form():
         doc_ref = job_sites_ref.add(job_site_data)
         st.success(f"Job Site {site_name} added with ID: {doc_ref.id}")
 
-# Streamlit UI for assigning employees to job sites
-def assign_employee_form():
-    st.header("Assign Employee to Job Site")
-
-    employee_id = st.text_input("Employee ID")
-    job_site_id = st.text_input("Job Site ID")
-    shift = st.selectbox("Shift", ["7:00-15:30", "14:00-22:00", "22:00-06:00"])
-    assigned_by = st.text_input("Assigned By")
-
-    if st.button("Assign Employee"):
-        assignment_data = {
-            "employee_id": employee_id,
-            "job_site_id": job_site_id,
-            "shift": shift,
-            "assigned_by": assigned_by,
-            "assigned_on": firestore.SERVER_TIMESTAMP
-        }
-        doc_ref = assignments_ref.add(assignment_data)
-        st.success(f"Employee {employee_id} assigned to Job Site {job_site_id} with assignment ID: {doc_ref.id}")
-
-# Streamlit UI to select and display different actions
-def main():
-    st.title("Employee and Job Site Management")
-
-    menu = ["Add Employee", "View Employees", "Add Job Site", "Assign Employee", "View Job Sites", "View Assignments"]
-    choice = st.sidebar.selectbox("Select an Action", menu)
-
-    if choice == "Add Employee":
-        add_employee_form()
-    elif choice == "View Employees":
-        view_employees()
-    elif choice == "Add Job Site":
-        add_job_site_form()
-    elif choice == "Assign Employee":
-        assign_employee_form()
-    elif choice == "View Job Sites":
-        view_job_sites()
-    elif choice == "View Assignments":
-        view_assignments()
-
-# Function to view job sites
+# Streamlit UI for viewing job sites
 def view_job_sites():
     st.header("View Job Sites")
 
@@ -198,7 +154,27 @@ def view_job_sites():
     # Display the data in a table format
     st.dataframe(job_sites_df)
 
-# Function to view assignments
+# Streamlit UI for assigning employees to job sites
+def assign_employee_form():
+    st.header("Assign Employee to Job Site")
+
+    employee_id = st.text_input("Employee ID")
+    job_site_id = st.text_input("Job Site ID")
+    shift = st.selectbox("Shift", ["7:00-15:30", "14:00-22:00", "22:00-06:00"])
+    assigned_by = st.text_input("Assigned By")
+
+    if st.button("Assign Employee"):
+        assignment_data = {
+            "employee_id": employee_id,
+            "job_site_id": job_site_id,
+            "shift": shift,
+            "assigned_by": assigned_by,
+            "assigned_on": firestore.SERVER_TIMESTAMP
+        }
+        doc_ref = assignments_ref.add(assignment_data)
+        st.success(f"Employee {employee_id} assigned to Job Site {job_site_id} with assignment ID: {doc_ref.id}")
+
+# Streamlit UI for viewing assignments
 def view_assignments():
     st.header("View Assignments")
 
@@ -209,21 +185,69 @@ def view_assignments():
     assignments_data = []
     for doc in docs:
         assignment = doc.to_dict()
-        assignment['assignment_id'] = doc.id  # Include the Firestore document ID
-        assignments_data.append(assignment)
+        # Extract the assigned_employee and site details
+        assigned_employee = assignment.get("assigned_employee", {})
+        assignment_data = {
+            "worker_id": assigned_employee.get("worker_id", "N/A"),
+            "first_name": assigned_employee.get("first_name", "N/A"),
+            "last_name": assigned_employee.get("last_name", "N/A"),
+            "phone_number": assigned_employee.get("phone_number", "N/A"),
+            "distance": assigned_employee.get("distance", "N/A"),
+            "rating": assigned_employee.get("rating", "N/A"),
+            "site_address": assignment.get("site_address", "N/A"),
+            "site_name": assignment.get("site_name", "N/A")
+        }
+        assignments_data.append(assignment_data)
 
     # Convert data to a DataFrame for better table formatting
     if assignments_data:
         df = pd.DataFrame(assignments_data)
 
-        # Reorder columns for better readability (optional)
-        column_order = ['assignment_id', 'employee_id', 'job_site_id', 'assigned_date']
+        # Reorder columns to match the specified order
+        column_order = [
+            "worker_id",
+            "first_name",
+            "last_name",
+            "phone_number",
+            "distance",
+            "rating",
+            "site_address",
+            "site_name"
+        ]
         df = df[column_order]
 
         # Display the data in a table format
         st.dataframe(df)
     else:
         st.write("No assignments found.")
+
+# Main function to organize the app
+def main():
+    st.title("Employee and Job Site Management")
+
+    # Sidebar with grouped options
+    st.sidebar.header("Navigation")
+
+    # Employees section
+    st.sidebar.subheader("Employees")
+    if st.sidebar.page_link("app.py", label="Add Employee"):
+        add_employee_form()
+    if st.sidebar.page_link("app.py", label="View Employees"):
+        view_employees()
+
+    # Job Sites section
+    st.sidebar.subheader("Job Sites")
+    if st.sidebar.page_link("app.py", label="Add Job Site"):
+        add_job_site_form()
+    if st.sidebar.page_link("app.py", label="View Job Sites"):
+        view_job_sites()
+
+    # Assignments section
+    st.sidebar.subheader("Assignments")
+    if st.sidebar.page_link("app.py", label="Assign Employee"):
+        assign_employee_form()
+    if st.sidebar.page_link("app.py", label="View Assignments"):
+        view_assignments()
 
 if __name__ == '__main__':
     main()
