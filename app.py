@@ -3,6 +3,8 @@ import firebase_admin
 import pandas as pd
 from firebase_admin import credentials, firestore, exceptions
 import random, string
+import time
+import subprocess, sys
 
 
 # Initialize Firebase only if not already initialized
@@ -122,7 +124,7 @@ def view_employees():
 #--------------------------------------------
 
 
-# Streamlit UI for adding a job site
+# ✅ Streamlit UI for Adding a Job Site
 def add_job_site_form():
     st.header("Add Job Site")
 
@@ -135,7 +137,14 @@ def add_job_site_form():
     site_contact_number = st.text_input("Site Contact Number")
     address = st.text_input("Site Address (Use Google Maps for accuracy)")
     
-    # Required roles selection with toggle
+    # ✅ Job Site Status Selection
+    job_status = st.selectbox("Job Site Status", ["Active", "Inactive", "Completed"])
+    
+    # ✅ Date Selection with Calendar Widget
+    work_start_date = st.date_input("Work Start Date")
+    work_end_date = st.date_input("Work End Date")
+    
+    # ✅ Required roles selection with toggle
     st.subheader("Required Roles")
     required_roles = {}
     roles = ["Cleaner", "Labour", "Painter"]
@@ -162,6 +171,9 @@ def add_job_site_form():
                 "site_superintendent": site_superintendent,
                 "site_contact_number": site_contact_number,
                 "address": address,
+                "job_status": job_status,
+                "work_start_date": work_start_date.strftime('%Y-%m-%d'),
+                "work_end_date": work_end_date.strftime('%Y-%m-%d'),
                 "required_roles": required_roles
             }
             
@@ -180,28 +192,44 @@ def add_job_site_form():
 #-----------------------------------------------------------------
 
 
-# Streamlit UI for assigning employees to job sites
-def assign_employee_form():
-    st.header("Assign Employee to Job Site")
+# ✅ Streamlit UI for Running Assignments
+def do_assignments():
+    st.header("Run Assignments")
+    st.write("Click the button below to run the assignment process and match employees to job sites. This will also remove old assignments to prevent duplicates.")
+    
+    if st.button("Run Assignments"):
+        with st.spinner("Fetching new Employees and Job Sites..."):
+            time.sleep(5)  # Simulate loading effect
+        with st.spinner("Updating assignments..."):
+            time.sleep(2)  # Simulate loading effect
+            
+            # ✅ Step 1: Delete Old Assignments
+            try:
+                old_assignments = assignments_ref.stream()
+                for doc in old_assignments:
+                    doc.reference.delete()
+                print("🗑️ Old assignments deleted successfully.")
+            except Exception as e:
+                st.error(f"❌ Error deleting old assignments: {e}")
+                return
+            
+            # ✅ Step 2: Run assign.py in the same Python environment
+            python_executable = sys.executable  # Ensures it runs in the same environment as Streamlit
+            process = subprocess.run([python_executable, "assign.py"], capture_output=True, text=True)
+            
+            if process.returncode == 0:
+                st.success("✅ Successfully executed assign.py, updated assignments, and removed duplicates!")
+            else:
+                st.error(f"❌ Error running assign.py: {process.stderr}")
+    
+        with st.spinner("Loading the new assigments, please wait..."):
+            time.sleep(2)  # Simulate loading effect
 
-    employee_id = st.text_input("Employee ID")
-    job_site_id = st.text_input("Job Site ID")
-    shift = st.selectbox("Shift", ["7:00-15:30", "14:00-22:00", "22:00-06:00"])
-    assigned_by = st.text_input("Assigned By")
-
-    if st.button("Assign Employee"):
-        assignment_data = {
-            "employee_id": employee_id,
-            "job_site_id": job_site_id,
-            "shift": shift,
-            "assigned_by": assigned_by,
-            "assigned_on": firestore.SERVER_TIMESTAMP
-        }
-        doc_ref = assignments_ref.add(assignment_data)
-        st.success(f"Employee {employee_id} assigned to Job Site {job_site_id} with assignment ID: {doc_ref.id}")
+        view_assignments() 
+    
 
 
-
+# ✅ Streamlit UI for Viewing Job Sites
 def view_job_sites():
     st.header("View Job Sites")
 
@@ -215,12 +243,15 @@ def view_job_sites():
 
         # Ensure essential fields exist, otherwise assign a default value
         job_site_data = {
-            "site_id": job_site.get("site_id", "N/A"),
-            "site_name": job_site.get("site_name", "N/A"),
-            "site_company": job_site.get("site_company", "N/A"),
-            "site_superintendent": job_site.get("site_superintendent", "N/A"),
-            "site_contact_number": job_site.get("site_contact_number", "N/A"),
-            "address": job_site.get("address", "N/A"),
+            "Site ID": job_site.get("site_id", "N/A"),
+            "Job Status": job_site.get("job_status", "N/A"),
+            "Work Start Date": job_site.get("work_start_date", "N/A"),
+            "Work End Date": job_site.get("work_end_date", "N/A"),
+            "Site Name": job_site.get("site_name", "N/A"),
+            "Company": job_site.get("site_company", "N/A"),
+            "Superintendent": job_site.get("site_superintendent", "N/A"),
+            "Contact Number": job_site.get("site_contact_number", "N/A"),
+            "Address": job_site.get("address", "N/A"),
         }
 
         # ✅ Calculate total number of required workers
@@ -236,8 +267,8 @@ def view_job_sites():
             # Accumulate total workers
             total_workers += num_workers
 
-        job_site_data["num_workers"] = total_workers  # Add computed num_workers
-        job_site_data["required_roles"] = ", ".join(formatted_roles) if formatted_roles else "N/A"
+        job_site_data["# Required Workers"] = total_workers  # Add computed num_workers
+        job_site_data["Required Roles"] = ", ".join(formatted_roles) if formatted_roles else "N/A"
 
         job_sites_data.append(job_site_data)
 
@@ -245,14 +276,15 @@ def view_job_sites():
     job_sites_df = pd.DataFrame(job_sites_data)
 
     # Define the correct column order
-    column_order = ["site_id", "site_name", "site_company", "site_superintendent", 
-                    "site_contact_number", "address", "num_workers", "required_roles"]
+    column_order = ["Site ID", "Job Status", "Work Start Date", "Work End Date", "Site Name", "Company", "Superintendent", 
+                    "Contact Number", "Address", "# Required Workers", "Required Roles"]
 
     # Ensure only existing columns are displayed
     job_sites_df = job_sites_df[column_order]
 
     # Display the data in a table format
     st.dataframe(job_sites_df)
+
 
 #--------------------------------------------
 
@@ -337,7 +369,7 @@ def main():
     menu2 = ["Add Job Site", "View Job Sites"]
     choice2 = st.sidebar.selectbox("Job Sites Actions selection:", menu2, index=None)
 
-    menu3 = ["Assign Employee", "View Assignments"]
+    menu3 = ["View Assignments", "Do Assignments"]
     choice3 = st.sidebar.selectbox("Assignments actions selection:", menu3, index=None)
 
     # Default view: Show image in the center before selection
@@ -354,8 +386,9 @@ def main():
     elif choice2 == "View Job Sites":
         view_job_sites()
     
-    if choice3 == "Assign Employee":
-        assign_employee_form()
+    if choice3 == "Do Assignments":
+        do_assignments()
+        
     elif choice3 == "View Assignments":
         view_assignments()
 
