@@ -87,6 +87,7 @@ def add_employee_form():
 # Streamlit UI for viewing all employees
 from datetime import datetime, timezone
 
+# ✅ Streamlit UI for Viewing Employees
 def view_employees():
     st.header("View Employees")
 
@@ -96,11 +97,14 @@ def view_employees():
 
     for doc in docs:
         data = doc.to_dict()
-        # Fetch the worker_id from Firestore document
-        if 'worker_id' in data:
-            data['worker_id'] = data['worker_id']  # Worker ID stored in Firestore
-        else:
-            data['worker_id'] = "N/A"  # Fallback if worker_id is not found
+        data['worker_id'] = data.get('worker_id', "N/A")
+        
+        # Ensure role, skills, certificates, and availability are always lists
+        data['role'] = data.get('role', []) if isinstance(data.get('role'), list) else [data.get('role', "")]
+        data['skills'] = data.get('skills', []) if isinstance(data.get('skills'), list) else [data.get('skills', "")]
+        data['certificates'] = data.get('certificates', []) if isinstance(data.get('certificates'), list) else [data.get('certificates', "")]
+        data['availability'] = data.get('availability', []) if isinstance(data.get('availability'), list) else [data.get('availability', "")]
+        
         employee_data.append(data)
 
     # Define the desired column order
@@ -361,37 +365,178 @@ def view_assignments():
 
 #--------------------------------------------
 
-# Streamlit UI to select and display different actions
+# ✅ Streamlit UI for Finding and Updating an Employee
+def find_and_update_employee():
+    st.header("Find and Update Employee")
+    
+    if st.button("New Search"):
+        st.session_state.pop("selected_employee", None)
+        st.session_state.pop("search_term", None)
+        st.rerun()
+    
+    search_term = st.text_input("Search by Worker ID, Phone Number, First Name, or Last Name", value=st.session_state.get("search_term", "")).strip().lower()
+    search_results = []
+
+    if st.button("Search"):
+        st.session_state["search_term"] = search_term
+        query_ref = employees_ref.stream()
+        
+        for doc in query_ref:
+            employee = doc.to_dict()
+            
+            if search_term in [
+                str(employee.get("worker_id", "")).lower(),
+                str(employee.get("phone_number", "")).lower(),
+                str(employee.get("first_name", "")).lower(),
+                str(employee.get("sur_name", "")).lower(),
+            ]:
+                employee["doc_id"] = doc.id  # Store Firestore document ID for updates
+                search_results.append(employee)
+
+        if search_results:
+            selected_employee = st.selectbox(
+                "Select Employee to Edit", 
+                search_results, 
+                format_func=lambda x: f"{x['first_name']} {x['sur_name']} ({x['worker_id']})"
+            )
+            if selected_employee:
+                st.session_state["selected_employee"] = selected_employee
+    
+    if "selected_employee" in st.session_state:
+        update_employee_form(st.session_state["selected_employee"]) 
+
+# ✅ Streamlit UI for Updating Employee Details
+def update_employee_form(employee):
+    st.subheader("Update Employee Details")
+    
+    first_name = st.text_input("First Name", employee["first_name"])
+    middle_name = st.text_input("Middle Name", employee["middle_name"])
+    sur_name = st.text_input("Surname", employee["sur_name"])
+    phone_number = st.text_input("Phone Number", employee["phone_number"])
+    home_address = st.text_input("Home Address", employee["home_address"])
+    have_car = st.selectbox("Do you have a car?", ["Yes", "No"], index=["Yes", "No"].index(employee["have_car"]))
+    role = st.multiselect("Role", ["Cleaner", "Labour", "Painter"], default=employee["role"])
+    availability = st.multiselect("Availability", ["7:00-15:30", "14:00-22:00", "22:00-06:00"], default=employee["availability"])
+    certificates = st.multiselect("Certifications", ["Working at Heights", "4 Steps", "WHMIS"], default=employee["certificates"])
+    skills = st.multiselect("Skills", ["Boomlift", "Scissors Lift", "Forklift"], default=employee["skills"])
+    rating = st.slider("Employee Rating", min_value=0.0, max_value=5.0, value=float(employee["rating"]), step=0.1)
+    
+    if st.button("Update Employee"):
+        updated_data = {
+            "first_name": first_name,
+            "middle_name": middle_name,
+            "sur_name": sur_name,
+            "phone_number": phone_number,
+            "home_address": home_address,
+            "have_car": have_car,
+            "role": role,
+            "availability": availability,
+            "certificates": certificates,
+            "skills": skills,
+            "rating": rating
+        }
+        try:
+            employees_ref.document(employee["doc_id"]).update(updated_data)
+            st.success("Employee updated successfully!")
+            st.session_state.pop("selected_employee", None)
+        except Exception as e:
+            st.error(f"Error updating employee: {str(e)}")
+
+# ✅ Streamlit UI for Finding and Updating a Job Site
+def find_and_update_job_site():
+    st.header("Find and Update Job Site")
+    
+    if st.button("New Search"):
+        st.session_state.pop("selected_job_site", None)
+        st.session_state.pop("search_term_job", None)
+        st.rerun()
+    
+    search_term = st.text_input("Search by Site ID, Site Name, Company, or Address", value=st.session_state.get("search_term_job", "")).strip().lower()
+    search_results = []
+
+    if st.button("Search"):
+        st.session_state["search_term_job"] = search_term
+        query_ref = job_sites_ref.stream()
+        
+        for doc in query_ref:
+            job_site = doc.to_dict()
+            
+            if any(search_term in str(job_site.get(field, "")).lower() for field in ["site_id", "site_name", "site_company", "address"]):
+                job_site["doc_id"] = doc.id  # Store Firestore document ID for updates
+                search_results.append(job_site)
+
+        if search_results:
+            selected_job_site = st.selectbox(
+                "Select Job Site to Edit", 
+                search_results, 
+                format_func=lambda x: f"{x['site_name']} ({x['site_id']})"
+            )
+            if selected_job_site:
+                st.session_state["selected_job_site"] = selected_job_site
+    
+    if "selected_job_site" in st.session_state:
+        update_job_site_form(st.session_state["selected_job_site"]) 
+
+# ✅ Streamlit UI for Updating Job Site Details
+def update_job_site_form(job_site):
+    st.subheader("Update Job Site Details")
+    
+    site_name = st.text_input("Site Name", job_site["site_name"])
+    site_company = st.text_input("Site Company", job_site["site_company"])
+    site_superintendent = st.text_input("Site Superintendent", job_site["site_superintendent"])
+    site_contact_number = st.text_input("Site Contact Number", job_site["site_contact_number"])
+    address = st.text_input("Site Address", job_site["address"])
+    job_status = st.selectbox("Job Status", ["Active", "Inactive", "Completed"], index=["Active", "Inactive", "Completed"].index(job_site["job_status"]))
+    work_start_date = st.date_input("Work Start Date", pd.to_datetime(job_site["work_start_date"]))
+    work_end_date = st.date_input("Work End Date", pd.to_datetime(job_site["work_end_date"]))
+    
+    if st.button("Update Job Site"):
+        updated_data = {
+            "site_name": site_name,
+            "site_company": site_company,
+            "site_superintendent": site_superintendent,
+            "site_contact_number": site_contact_number,
+            "address": address,
+            "job_status": job_status,
+            "work_start_date": work_start_date.strftime('%Y-%m-%d'),
+            "work_end_date": work_end_date.strftime('%Y-%m-%d')
+        }
+        try:
+            job_sites_ref.document(job_site["doc_id"]).update(updated_data)
+            st.success("Job Site updated successfully!")
+            st.session_state.pop("selected_job_site", None)
+        except Exception as e:
+            st.error(f"Error updating job site: {str(e)}")
+
+# ✅ Streamlit UI to select and display different actions
 def main():
-    menu1 = ["Add Employee", "View Employees"]
+    menu1 = ["Add Employee", "View Employees", "Find and Update"]
     choice1 = st.sidebar.selectbox("Employees Actions selection:", menu1, index=None)
 
-    menu2 = ["Add Job Site", "View Job Sites"]
+    menu2 = ["Add Job Site", "View Job Sites", "Find and Update"]
     choice2 = st.sidebar.selectbox("Job Sites Actions selection:", menu2, index=None)
 
     menu3 = ["View Assignments", "Do Assignments"]
-    choice3 = st.sidebar.selectbox("Assignments actions selection:", menu3, index=None)
-
-    # Default view: Show image in the center before selection
-    if choice1 is None and choice2 is None and choice3 is None:
-        st.image("optishift_logo.png", use_container_width=True)
+    choice3 = st.sidebar.selectbox("Assignments Actions selection:", menu3, index=None)
 
     if choice1 == "Add Employee":
         add_employee_form()
     elif choice1 == "View Employees":
         view_employees()
+    elif choice1 == "Find and Update":
+        find_and_update_employee()
     
     if choice2 == "Add Job Site":
         add_job_site_form()
     elif choice2 == "View Job Sites":
         view_job_sites()
+    elif choice2 == "Find and Update":
+        find_and_update_job_site()
     
     if choice3 == "Do Assignments":
         do_assignments()
-        
     elif choice3 == "View Assignments":
         view_assignments()
 
 if __name__ == '__main__':
     main()
-
