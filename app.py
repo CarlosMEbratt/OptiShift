@@ -5,6 +5,7 @@ from firebase_admin import credentials, firestore, exceptions
 import random, string
 import time
 import subprocess, sys
+from twilio.rest import Client
 
 
 # Initialize Firebase only if not already initialized
@@ -365,9 +366,9 @@ def view_assignments():
 
 #--------------------------------------------
 
-# ✅ Streamlit UI for Finding and Updating an Employee
+# ✅ Streamlit UI for Finding, Updating, and Deleting an Employee
 def find_and_update_employee():
-    st.header("Find and Update Employee")
+    st.header("Find, Update, or Delete Employee")
     
     if st.button("New Search"):
         st.session_state.pop("selected_employee", None)
@@ -384,18 +385,13 @@ def find_and_update_employee():
         for doc in query_ref:
             employee = doc.to_dict()
             
-            if search_term in [
-                str(employee.get("worker_id", "")).lower(),
-                str(employee.get("phone_number", "")).lower(),
-                str(employee.get("first_name", "")).lower(),
-                str(employee.get("sur_name", "")).lower(),
-            ]:
+            if any(search_term in str(employee.get(field, "")).lower() for field in ["worker_id", "phone_number", "first_name", "sur_name"]):
                 employee["doc_id"] = doc.id  # Store Firestore document ID for updates
                 search_results.append(employee)
 
         if search_results:
             selected_employee = st.selectbox(
-                "Select Employee to Edit", 
+                "Select Employee to Edit or Delete", 
                 search_results, 
                 format_func=lambda x: f"{x['first_name']} {x['sur_name']} ({x['worker_id']})"
             )
@@ -403,7 +399,19 @@ def find_and_update_employee():
                 st.session_state["selected_employee"] = selected_employee
     
     if "selected_employee" in st.session_state:
-        update_employee_form(st.session_state["selected_employee"]) 
+        update_employee_form(st.session_state["selected_employee"])
+        
+        # Delete Employee Button
+        if st.button("Delete Employee"):
+            try:
+                doc_id = st.session_state["selected_employee"]["doc_id"]
+                employees_ref.document(doc_id).delete()
+                st.success("✅ Employee deleted successfully!")
+                st.session_state.pop("selected_employee", None)
+                st.session_state.pop("search_term", None)
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Error deleting employee: {e}")
 
 # ✅ Streamlit UI for Updating Employee Details
 def update_employee_form(employee):
@@ -508,6 +516,37 @@ def update_job_site_form(job_site):
         except Exception as e:
             st.error(f"Error updating job site: {str(e)}")
 
+# ✅ Twilio Credentials (Replace these with your actual credentials)
+TWILIO_SID = "ACea4083caabbc067e4b57269ee7e90f8e"
+TWILIO_AUTH_TOKEN = "1a0e3164e8faf75f4286c4bde720c5b3"
+TWILIO_PHONE_NUMBER = "+18573492964"
+
+# ✅ Function to Send SMS
+def send_sms(to, message):
+    """Sends an SMS message using Twilio API"""
+    client = Client(TWILIO_SID, TWILIO_AUTH_TOKEN)
+    try:
+        sms = client.messages.create(
+            body=message,
+            from_=TWILIO_PHONE_NUMBER,
+            to=to  # Recipient's phone number
+        )
+        st.success(f"✅ Message sent successfully! SID: {sms.sid}")
+    except Exception as e:
+        st.error(f"❌ Error sending message: {e}")
+
+# ✅ Streamlit UI for Sending SMS Notifications
+def notify_employees():
+    st.header("📲 Notify Employees via SMS")
+    recipient_number = st.text_input("Enter Recipient's Phone Number (E.g., +1234567890)")
+    sms_message = st.text_area("Enter your message")
+
+    if st.button("Send SMS"):
+        if recipient_number and sms_message:
+            send_sms(recipient_number, sms_message)
+        else:
+            st.warning("⚠️ Please enter a phone number and message.")
+
 # ✅ Streamlit UI to select and display different actions
 def main():
     menu1 = ["Add Employee", "View Employees", "Find and Update"]
@@ -516,8 +555,12 @@ def main():
     menu2 = ["Add Job Site", "View Job Sites", "Find and Update"]
     choice2 = st.sidebar.selectbox("Job Sites Actions selection:", menu2, index=None)
 
-    menu3 = ["View Assignments", "Do Assignments"]
+    menu3 = ["View Assignments", "Do Assignments", "Notify Employees"]
     choice3 = st.sidebar.selectbox("Assignments Actions selection:", menu3, index=None)
+
+    # Default view: Show image in the center before selection
+    if choice1 is None and choice2 is None and choice3 is None:
+        st.image("optishift_logo.png", use_container_width=True)
 
     if choice1 == "Add Employee":
         add_employee_form()
@@ -537,6 +580,8 @@ def main():
         do_assignments()
     elif choice3 == "View Assignments":
         view_assignments()
+    elif choice3 == "Notify Employees":
+        notify_employees()
 
 if __name__ == '__main__':
     main()
