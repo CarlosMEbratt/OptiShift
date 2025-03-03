@@ -1,7 +1,11 @@
 import streamlit as st
 import firebase_admin
 import pandas as pd
-from firebase_admin import credentials, firestore, exceptions
+
+from firebase_admin import credentials, firestore, auth
+import requests
+from datetime import datetime, timezone
+
 import random, string
 import time
 import subprocess, sys
@@ -29,6 +33,7 @@ db = firestore.client()
 employees_ref = db.collection('employees')
 job_sites_ref = db.collection('job_sites')
 assignments_ref = db.collection('assignments')
+users_ref = db.collection('users')  # 🔹 Collection for storing users
 
 # Streamlit UI for adding an employee
 def add_employee_form():
@@ -85,8 +90,7 @@ def add_employee_form():
 
 
 
-# Streamlit UI for viewing all employees
-from datetime import datetime, timezone
+#----------------------------------------------------------------------------------------
 
 # ✅ Streamlit UI for Viewing Employees
 def view_employees():
@@ -100,17 +104,27 @@ def view_employees():
         data = doc.to_dict()
         data['worker_id'] = data.get('worker_id', "N/A")
         
-        # Ensure role, skills, certificates, and availability are always lists
+        # Ensure role, skills, and availability are always lists
         data['role'] = data.get('role', []) if isinstance(data.get('role'), list) else [data.get('role', "")]
         data['skills'] = data.get('skills', []) if isinstance(data.get('skills'), list) else [data.get('skills', "")]
-        data['certificates'] = data.get('certificates', []) if isinstance(data.get('certificates'), list) else [data.get('certificates', "")]
         data['availability'] = data.get('availability', []) if isinstance(data.get('availability'), list) else [data.get('availability', "")]
         
+        # ✅ Convert the certificates dictionary into a readable string
+        certificates = data.get("certificates", {})
+        if isinstance(certificates, dict):
+            formatted_certificates = [
+                f"{cert} (Issued: {info.get('issue_date', 'N/A')}, Exp: {info.get('expiration_date', 'N/A')})"
+                for cert, info in certificates.items()
+            ]
+            data['certificates'] = ", ".join(formatted_certificates) if formatted_certificates else "None"
+        else:
+            data['certificates'] = "None"
+
         employee_data.append(data)
 
     # Define the desired column order
     column_order = [
-        'worker_id', 'first_name', 'middle_name', 'sur_name', 'phone_number', 'home_address','have_car', 
+        'worker_id', 'first_name', 'middle_name', 'sur_name', 'phone_number', 'home_address', 'have_car', 
         'role', 'skills', 'certificates', 'availability', 'rating'
     ]
 
@@ -126,7 +140,8 @@ def view_employees():
         st.write("No employees found.")
 
 
-#--------------------------------------------
+
+#----------------------------------------------------------------------------------------
 
 
 # ✅ Streamlit UI for Adding a Job Site
@@ -232,7 +247,7 @@ def do_assignments():
 
         view_assignments() 
     
-
+#----------------------------------------------------------------------------------------
 
 # ✅ Streamlit UI for Viewing Job Sites
 def view_job_sites():
@@ -364,7 +379,7 @@ def view_assignments():
 
 
 
-#--------------------------------------------
+#----------------------------------------------------------------------------------------
 
 # ✅ Streamlit UI for Finding, Updating, and Deleting an Employee
 def find_and_update_employee():
@@ -413,6 +428,10 @@ def find_and_update_employee():
             except Exception as e:
                 st.error(f"❌ Error deleting employee: {e}")
 
+
+#----------------------------------------------------------------------------------------
+
+
 # ✅ Streamlit UI for Updating Employee Details
 def update_employee_form(employee):
     st.subheader("Update Employee Details")
@@ -450,6 +469,10 @@ def update_employee_form(employee):
         except Exception as e:
             st.error(f"Error updating employee: {str(e)}")
 
+
+
+#----------------------------------------------------------------------------------------
+
 # ✅ Streamlit UI for Finding and Updating a Job Site
 def find_and_update_job_site():
     st.header("Find and Update Job Site")
@@ -485,6 +508,10 @@ def find_and_update_job_site():
     if "selected_job_site" in st.session_state:
         update_job_site_form(st.session_state["selected_job_site"]) 
 
+
+#----------------------------------------------------------------------------------------
+
+
 # ✅ Streamlit UI for Updating Job Site Details
 def update_job_site_form(job_site):
     st.subheader("Update Job Site Details")
@@ -515,6 +542,10 @@ def update_job_site_form(job_site):
             st.session_state.pop("selected_job_site", None)
         except Exception as e:
             st.error(f"Error updating job site: {str(e)}")
+
+
+#----------------------------------------------------------------------------------------
+
 
 # ✅ Twilio Credentials (Replace these with your actual credentials)
 TWILIO_SID = "ACea4083caabbc067e4b57269ee7e90f8e"
@@ -547,41 +578,377 @@ def notify_employees():
         else:
             st.warning("⚠️ Please enter a phone number and message.")
 
-# ✅ Streamlit UI to select and display different actions
+
+#----------------------------------------------------------------------------------------
+
+
+FIREBASE_WEB_API_KEY = "AIzaSyCZD1HVMBWaDHh2DlAI8gIFiNvHiOoRxiU"
+
+# ✅ Initialize Firebase Admin (Only Once)
+if not firebase_admin._apps:
+    cred = credentials.Certificate("serviceAccountKey.json")  # Make sure you have this key file
+    firebase_admin.initialize_app(cred)
+
+db = firestore.client()
+users_ref = db.collection("users")  # Stores user authentication & role info
+employees_ref = db.collection("employees")  # Stores employee profile data
+
+
+def generate_worker_id():
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+
+
+#----------------------------------------------------------------------------------------
+
+
+# ✅ Function to Register a User and Add to Employees Database
+def register_user(email, password):
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={FIREBASE_WEB_API_KEY}"
+    data = {"email": email, "password": password, "returnSecureToken": True}
+    response = requests.post(url, json=data)
+    result = response.json()
+
+    if "idToken" in result:
+        user_id = result["localId"]
+        worker_id = generate_worker_id()  # Generate a unique worker ID
+
+        st.success(f"✅ Account created successfully: {email}")
+
+        # ✅ Store user data in Firestore (Default role: Employee)
+        users_ref.document(user_id).set({
+            "email": email,
+            "role": "employee"
+        })
+
+        # ✅ Store employee profile with default values in Firestore
+        employees_ref.document(user_id).set({
+            "worker_id": worker_id,  # Store the generated worker ID
+            "email": email,
+            "first_name": "",
+            "middle_name": "",
+            "sur_name": "",
+            "phone_number": "",
+            "home_address": "",
+            "have_car": "No",
+            "role": [],
+            "availability": [],
+            "certificates": [],
+            "skills": [],
+            "rating": 3.0  # Default rating
+        })
+
+        # ✅ Update session and redirect
+        st.session_state["authenticated"] = True
+        st.session_state["user_id"] = user_id
+        st.session_state["user_email"] = email
+        st.session_state["user_role"] = "employee"
+        st.rerun()
+    else:
+        error_message = result.get('error', {}).get('message', 'Unknown error')
+        st.error(f"❌ Registration failed: {error_message}")
+
+
+#----------------------------------------------------------------------------------------
+
+
+# ✅ Function to Log In a User
+def login_user(email, password):
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={FIREBASE_WEB_API_KEY}"
+    data = {"email": email, "password": password, "returnSecureToken": True}
+    response = requests.post(url, json=data)
+    result = response.json()
+
+    if "idToken" in result:
+        user_id = result["localId"]
+        user_doc = users_ref.document(user_id).get()
+
+        if user_doc.exists:
+            user_data = user_doc.to_dict()
+            st.session_state["authenticated"] = True
+            st.session_state["user_id"] = user_id
+            st.session_state["user_email"] = email
+            st.session_state["user_role"] = user_data.get("role", "employee")
+            st.session_state["login_error"] = None  # ✅ Clear previous errors
+            st.rerun()
+        else:
+            st.session_state["login_error"] = "❌ User not found in Firestore. Contact admin."
+    else:
+        error_message = result.get('error', {}).get('message', 'Invalid credentials')
+        st.session_state["login_error"] = f"❌ Login failed: {error_message}"  # ✅ Store error message persistently
+
+
+#----------------------------------------------------------------------------------------
+
+# ✅ Sidebar Navigation
+def sidebar_menu():
+    st.sidebar.header("📋 Navigation")
+
+    if st.session_state["user_role"] == "admin":
+
+        st.sidebar.image("optishift_logo.png", use_container_width=True)
+        if st.sidebar.button("👥 Employees"):
+            st.session_state["selected_section"] = "employees"
+        if st.sidebar.button("🏗️ Job Sites"):
+            st.session_state["selected_section"] = "job_sites"
+        if st.sidebar.button("📋 Assignments"):
+            st.session_state["selected_section"] = "assignments"
+    else:
+        st.sidebar.image("optishift_logo.png", use_container_width=True)
+        if st.sidebar.button("📝 Update Profile"):
+            
+            st.session_state["selected_section"] = "profile"
+
+    st.sidebar.write("---")
+    if st.sidebar.button("🚪 Logout"):
+        st.session_state.clear()
+        st.rerun()
+
+
+#----------------------------------------------------------------------------------------
+
+
+# ✅ Profile Update (For Employees) with Certificate Dates
+def update_profile():
+    st.subheader("📝 Update Your Profile")
+
+    user_id = st.session_state["user_id"]
+    employee_doc = employees_ref.document(user_id).get()
+
+    if employee_doc.exists:
+        employee = employee_doc.to_dict()
+
+        # Ensure Worker ID exists, if missing assign one
+        if "worker_id" not in employee or not employee["worker_id"]:
+            worker_id = generate_worker_id()
+            employees_ref.document(user_id).update({"worker_id": worker_id})
+        else:
+            worker_id = employee["worker_id"]
+
+        first_name = st.text_input("First Name", employee["first_name"])
+        middle_name = st.text_input("Middle Name", employee["middle_name"])
+        sur_name = st.text_input("Surname", employee["sur_name"])
+        phone_number = st.text_input("Phone Number", employee["phone_number"])
+        home_address = st.text_input("Home Address", employee["home_address"])
+        have_car = st.selectbox("Do you have a car?", ["Yes", "No"], index=["Yes", "No"].index(employee["have_car"]))
+        role = st.multiselect("Role", ["Cleaner", "Labour", "Painter"], default=employee["role"])
+        availability = st.multiselect("Availability", ["7:00-15:30", "14:00-22:00", "22:00-06:00"], default=employee["availability"])
+        skills = st.multiselect("Skills", ["Boomlift", "Scissors Lift", "Forklift"], default=employee["skills"])
+
+        # ✅ Ensure certificates are stored as a dictionary (Fix for AttributeError)
+        certificates = employee.get("certificates", {})
+
+        if isinstance(certificates, list):
+            # Convert list to dictionary format (assume previous format only contained certificate names)
+            certificates = {cert: {"issue_date": "2024-01-01", "expiration_date": "2026-01-01"} for cert in certificates}
+
+        # ✅ Handling Certificate Issue & Expiration Dates
+        st.subheader("📜 Certifications")
+        updated_certificates = {}
+
+        for cert in ["Working at Heights", "4 Steps", "WHMIS"]:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                cert_selected = st.checkbox(cert, value=(cert in certificates))
+            with col2:
+                issue_date = st.date_input(
+                    f"Issue Date for {cert}", 
+                    value=pd.to_datetime(certificates.get(cert, {}).get("issue_date", "2024-01-01")),
+                    disabled=not cert_selected
+                )
+            with col3:
+                expiration_date = st.date_input(
+                    f"Expiration Date for {cert}", 
+                    value=pd.to_datetime(certificates.get(cert, {}).get("expiration_date", "2026-01-01")),
+                    disabled=not cert_selected
+                )
+            
+            if cert_selected:
+                updated_certificates[cert] = {
+                    "issue_date": issue_date.strftime("%Y-%m-%d"),
+                    "expiration_date": expiration_date.strftime("%Y-%m-%d")
+                }
+
+        # ✅ Check if rating is locked (employees should only set rating once)
+        rating_locked = employee.get("rating_locked", False)
+
+        if not rating_locked:
+            rating = st.slider("Employee Rating (One-Time Auto-Evaluation)", min_value=0.0, max_value=5.0, value=float(employee["rating"]), step=0.1)
+            st.warning("⚠️ You can only set your rating once.")
+        else:
+            rating = employee["rating"]  # Keep it unchanged
+            st.info(f"⭐ Your current rating: **{rating}** (Auto-evaluation complete)")
+
+        if st.button("Update Profile"):
+            updated_data = {
+                "worker_id": worker_id,
+                "first_name": first_name,
+                "middle_name": middle_name,
+                "sur_name": sur_name,
+                "phone_number": phone_number,
+                "home_address": home_address,
+                "have_car": have_car,
+                "role": role,
+                "availability": availability,
+                "skills": skills,
+                "certificates": updated_certificates  # ✅ Store updated certificates with dates
+            }
+
+            # ✅ Allow rating update only if it was never set before
+            if not rating_locked:
+                updated_data["rating"] = rating
+                updated_data["rating_locked"] = True  # ✅ Lock the rating after first update
+
+            try:
+                employees_ref.document(user_id).update(updated_data)
+                st.success("✅ Profile updated successfully!")
+            except Exception as e:
+                st.error(f"❌ Error updating profile: {str(e)}")
+
+              
+#----------------------------------------------------------------------------------------               
+
+# ✅ Main View (For Admins)
+def main_view():
+    st.header("📊 Admin Dashboard")
+
+    if st.session_state["selected_section"] == "employees":
+        st.subheader("👥 Employee Actions")
+        menu = ["Add Employee", "View Employees", "Find and Update Employee"]
+        choice = st.selectbox("Choose an action:", menu, index=None)
+
+        if choice == "Add Employee":
+            add_employee_form()
+        elif choice == "View Employees":
+            view_employees()
+        elif choice == "Find and Update Employee":
+            find_and_update_employee()
+
+    elif st.session_state["selected_section"] == "job_sites":
+        st.subheader("🏗️ Job Site Actions")
+        menu = ["Add Job Site", "View Job Sites", "Find and Update Job Site"]
+        choice = st.selectbox("Choose an action:", menu, index=None)
+
+        if choice == "Add Job Site":
+            add_job_site_form()
+        elif choice == "View Job Sites":
+            view_job_sites()
+        elif choice == "Find and Update Job Site":
+            find_and_update_job_site()
+
+    elif st.session_state["selected_section"] == "assignments":
+        st.subheader("📋 Assignments Actions")
+        menu = ["View Assignments", "Do Assignments", "Notify Employees"]
+        choice = st.selectbox("Choose an action:", menu, index=None)
+
+        if choice == "View Assignments":
+            view_assignments()
+        elif choice == "Do Assignments":
+            do_assignments()
+        elif choice == "Notify Employees":
+            notify_employees()
+
+# ✅ Ensure session state is initialized
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+if "user_email" not in st.session_state:
+    st.session_state["user_email"] = None
+if "user_role" not in st.session_state:
+    st.session_state["user_role"] = "employee"  # Default role is employee
+if "user_id" not in st.session_state:
+    st.session_state["user_id"] = None
+if "selected_section" not in st.session_state:
+    st.session_state["selected_section"] = None  # ✅ Ensure this key exists
+if "auth_page" not in st.session_state:
+    st.session_state["auth_page"] = None  # ✅ Ensure auth_page is initialized
+if "show_logo_after_auth" not in st.session_state:
+    st.session_state["show_logo_after_auth"] = False  # ✅ Ensure this key exists
+
+#----------------------------------------------------------------------------------------
+
+# ✅ Authentication UI with Persistent Error Messages
+def authentication_ui():
+    if st.session_state.get("authenticated"):
+        return  # Hide authentication UI after login
+
+    # ✅ Display OptiShift logo at the top, always visible
+    st.title("Welcome to")
+    st.image("optishift_logo.png", use_container_width=True)
+    st.subheader("Please log in or register to continue.")
+
+    st.sidebar.header("🔑 Authentication")
+
+    col1, col2 = st.sidebar.columns(2)
+
+    # ✅ Handle button clicks to show the selected form
+    if col1.button("🔐 Login"):
+        st.session_state["auth_page"] = "login"
+        st.session_state["login_error"] = None  # ✅ Reset error on page switch
+    if col2.button("📝 Register"):
+        st.session_state["auth_page"] = "register"
+        st.session_state["login_error"] = None  # ✅ Reset error on page switch
+
+    # ✅ Show login or register form dynamically
+    if st.session_state.get("auth_page") == "login":
+        st.subheader("🔐 Login to Your Account")
+        email = st.text_input("Enter Email Address")
+        password = st.text_input("Enter Password", type="password")
+
+        if st.button("Login"):
+            login_user(email, password)  # ✅ Perform login
+
+        # ✅ Display persistent error message if login fails
+        if st.session_state.get("login_error"):
+            st.error(st.session_state["login_error"])
+
+    elif st.session_state.get("auth_page") == "register":
+        st.subheader("📝 Create a New Account")
+        email = st.text_input("Enter Email Address")
+        password = st.text_input("Enter Password", type="password")
+        confirm_password = st.text_input("Confirm Password", type="password")
+
+        if st.button("Register"):
+            if password == confirm_password:
+                register_user(email, password)  # ✅ Perform registration
+                st.session_state["show_logo_after_auth"] = True  # ✅ Show logo after registration
+                st.session_state["login_error"] = None  # ✅ Reset error on successful registration
+                st.rerun()  # ✅ Refresh UI
+            else:
+                st.warning("⚠️ Passwords do not match. Please try again.")
+
+
+
+
+
+#----------------------------------------------------------------------------------------
+
+
+# ✅ Main UI with OptiShift Logo for Employees Until Profile Update
 def main():
-    menu1 = ["Add Employee", "View Employees", "Find and Update"]
-    choice1 = st.sidebar.selectbox("Employees Actions selection:", menu1, index=None)
+    authentication_ui()
 
-    menu2 = ["Add Job Site", "View Job Sites", "Find and Update"]
-    choice2 = st.sidebar.selectbox("Job Sites Actions selection:", menu2, index=None)
+    # ✅ Show Welcome Screen ONLY if user is NOT authenticated
+    if not st.session_state.get("authenticated"):       
+        return  # ✅ Stop execution here to prevent navigation showing
 
-    menu3 = ["View Assignments", "Do Assignments", "Notify Employees"]
-    choice3 = st.sidebar.selectbox("Assignments Actions selection:", menu3, index=None)
+    # ✅ Show OptiShift Logo for Employees Until Profile is Updated
+    if st.session_state.get("show_logo_after_auth", False) and not st.session_state.get("profile_updated", False):
+        if st.session_state["user_role"] == "employee":  # ✅ Show only for employees
+            st.image("optishift_logo.png", use_container_width=True)
+            st.title("Welcome to OptiShift!")
+            st.subheader("Your account has been successfully created! Please update your profile.")
+        return  # ✅ Prevents moving forward until profile update is done
 
-    # Default view: Show image in the center before selection
-    if choice1 is None and choice2 is None and choice3 is None:
-        st.image("optishift_logo.png", use_container_width=True)
+    # ✅ Show navigation menu AFTER authentication and logo display
+    sidebar_menu()
 
-    if choice1 == "Add Employee":
-        add_employee_form()
-    elif choice1 == "View Employees":
-        view_employees()
-    elif choice1 == "Find and Update":
-        find_and_update_employee()
-    
-    if choice2 == "Add Job Site":
-        add_job_site_form()
-    elif choice2 == "View Job Sites":
-        view_job_sites()
-    elif choice2 == "Find and Update":
-        find_and_update_job_site()
-    
-    if choice3 == "Do Assignments":
-        do_assignments()
-    elif choice3 == "View Assignments":
-        view_assignments()
-    elif choice3 == "Notify Employees":
-        notify_employees()
+    # ✅ Ensure logo does NOT appear on the admin dashboard
+    if st.session_state.get("selected_section") == "profile":
+        update_profile()
+    elif st.session_state["user_role"] == "admin":
+        main_view()  # ✅ Admin sees full menu
 
+
+
+# ✅ Run App
 if __name__ == '__main__':
     main()
