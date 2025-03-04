@@ -1,42 +1,25 @@
 import streamlit as st
 import firebase_admin
 import pandas as pd
-
-from firebase_admin import credentials, firestore, auth
 import requests
-
-import random, string, os, json
-import time
-import subprocess, sys
+import random, string, os, json, time, subprocess, sys
+from firebase_admin import credentials, firestore, auth
 from twilio.rest import Client
 
-
-# # Initialize Firebase only if not already initialized
-# def initialize_firebase():
-#     try:
-#         # Check if Firebase has already been initialized
-#         if not firebase_admin._apps:
-#             cred = credentials.Certificate('serviceAccountKey.json')
-#             firebase_admin.initialize_app(cred)
-        
-#     except Exception as e:
-#         st.write(f"Error initializing Firebase: {e}")
-
-# ✅ Load Firebase credentials from environment variable
-firebase_credentials = os.getenv("FIREBASE_CREDENTIALS")
+# ✅ Load Firebase credentials correctly from Streamlit secrets
+firebase_credentials = st.secrets["FIREBASE_CREDENTIALS"]
 
 if firebase_credentials:
-    cred_dict = json.loads(firebase_credentials)
-    cred = credentials.Certificate(cred_dict)
-    firebase_admin.initialize_app(cred)
+    cred_dict = json.loads(firebase_credentials)  # Convert string to dictionary
+    if not firebase_admin._apps:  # ✅ Initialize Firebase only if not already initialized
+        cred = credentials.Certificate(cred_dict)
+        firebase_admin.initialize_app(cred)
 else:
-    raise ValueError("FIREBASE_CREDENTIALS environment variable not set.")
+    raise ValueError("🔥 FIREBASE_CREDENTIALS not set. Configure it in Streamlit Secrets.")
 
-# Initialize Firebase (only once)
-initialize_firebase()
-
-# Initialize Firestore client
+# ✅ Initialize Firestore client
 db = firestore.client()
+
 
 # Collection references
 employees_ref = db.collection('employees')
