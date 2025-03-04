@@ -4,7 +4,6 @@ import pandas as pd
 
 from firebase_admin import credentials, firestore, auth
 import requests
-from datetime import datetime, timezone
 
 import random, string
 import time
@@ -35,38 +34,37 @@ job_sites_ref = db.collection('job_sites')
 assignments_ref = db.collection('assignments')
 users_ref = db.collection('users')  # 🔹 Collection for storing users
 
+#----------------------------------------------------------------------------------------
+
 # Streamlit UI for adding an employee
 def add_employee_form():
     st.header("Add Employee")
 
-    # Generate a random worker ID
-    worker_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    with st.form(key="add_employee_form"):
+        worker_id = generate_worker_id()
+        
+        first_name = st.text_input("First Name")
+        middle_name = st.text_input("Middle Name")
+        sur_name = st.text_input("Surname")
+        phone_number = st.text_input("Phone Number")  
+        home_address = st.text_input("Home Location (e.g., 43.7,-79.3 for Toronto)")
+        have_car = st.selectbox("Do you have a car?", ["Yes", "No"])
+        role = st.multiselect("Role", ["Cleaner", "Labour", "Painter"])
+        availability = st.multiselect("Availability", ["7:00-15:30", "14:00-22:00", "22:00-06:00"])
+        certificates = st.multiselect("Certifications", ["Working at Heights", "4 Steps", "WHMIS"])
+        skills = st.multiselect("Skills", ["Boomlift", "Scissors Lift", "Forklift"])
+        rating = st.slider("Employee Rating", min_value=0.0, max_value=5.0, value=3.0, step=0.1)
 
-    first_name = st.text_input("First Name")
-    middle_name = st.text_input("Middle Name")
-    sur_name = st.text_input("Surname")
-    phone_number = st.text_input("Phone Number")  # Changed from number_input to text_input for better validation
-    home_address = st.text_input("Home Location (e.g., 43.7,-79.3 for Toronto)")
-    have_car = st.selectbox("Do you have a car?", ["Yes", "No"])
-    
-    role = st.multiselect("Role", ["Cleaner", "Labour", "Painter"])
+        submit_button = st.form_submit_button("Add Employee")
 
-    availability = st.multiselect("Availability", ["7:00-15:30", "14:00-22:00", "22:00-06:00"])
-    
-    certificates = st.multiselect("Certifications", ["Working at Heights", "4 Steps", "WHMIS"])
-    
-    skills = st.multiselect("Skills", ["Boomlift", "Scissors Lift", "Forklift"])
-    
-    rating = st.slider("Employee Rating", min_value=0.0, max_value=5.0, value=3.0, step=0.1)  # Allows float rating selection
-    
-    if st.button("Add Employee"):
+    if submit_button:
         employee_data = {
             "worker_id": worker_id,
-            "first_name": first_name,
-            "middle_name": middle_name,
-            "sur_name": sur_name,
-            "phone_number": phone_number,
-            "home_address": home_address,
+            "first_name": first_name.strip(),
+            "middle_name": middle_name.strip(),
+            "sur_name": sur_name.strip(),
+            "phone_number": phone_number.strip(),
+            "home_address": home_address.strip(),
             "have_car": have_car,
             "role": role,
             "availability": availability,
@@ -75,18 +73,13 @@ def add_employee_form():
             "rating": rating
         }
 
-        # Add document to Firestore
-        doc_ref = employees_ref.add(employee_data)
+        try:
+            # ✅ Firestore add() now returns a DocumentReference, from which we get .id
+            doc_ref = employees_ref.add(employee_data)[1]  # Correctly extract the Firestore ID
+            st.success(f"✅ Employee added with ID: {doc_ref.id}")
+        except Exception as e:
+            st.error(f"❌ Error adding employee: {str(e)}")
 
-        # Check the result of the add() operation
-        if isinstance(doc_ref, tuple):
-            # Handle the case where add() returns a tuple
-            employee_id = doc_ref[0]  # Extract the ID from the tuple
-        else:
-            # Normally, doc_ref should be a DocumentReference
-            employee_id = doc_ref.id
-
-        st.success(f"Employee {first_name} {sur_name} added with ID: {employee_id}")
 
 
 
@@ -96,287 +89,59 @@ def add_employee_form():
 def view_employees():
     st.header("View Employees")
 
-    # Fetch employee data
-    docs = employees_ref.stream()
-    employee_data = []
-
-    for doc in docs:
-        data = doc.to_dict()
-        data['worker_id'] = data.get('worker_id', "N/A")
-        
-        # Ensure role, skills, and availability are always lists
-        data['role'] = data.get('role', []) if isinstance(data.get('role'), list) else [data.get('role', "")]
-        data['skills'] = data.get('skills', []) if isinstance(data.get('skills'), list) else [data.get('skills', "")]
-        data['availability'] = data.get('availability', []) if isinstance(data.get('availability'), list) else [data.get('availability', "")]
-        
-        # ✅ Convert the certificates dictionary into a readable string
-        certificates = data.get("certificates", {})
-        if isinstance(certificates, dict):
-            formatted_certificates = [
-                f"{cert} (Issued: {info.get('issue_date', 'N/A')}, Exp: {info.get('expiration_date', 'N/A')})"
-                for cert, info in certificates.items()
-            ]
-            data['certificates'] = ", ".join(formatted_certificates) if formatted_certificates else "None"
-        else:
-            data['certificates'] = "None"
-
-        employee_data.append(data)
-
-    # Define the desired column order
-    column_order = [
-        'worker_id', 'first_name', 'middle_name', 'sur_name', 'phone_number', 'home_address', 'have_car', 
-        'role', 'skills', 'certificates', 'availability', 'rating'
+    # Fetch and structure employee data efficiently
+    employee_data = [
+        {
+            "worker_id": doc.get("worker_id", "N/A"),
+            "first_name": doc.get("first_name", "N/A"),
+            "middle_name": doc.get("middle_name", "N/A"),
+            "sur_name": doc.get("sur_name", "N/A"),
+            "phone_number": doc.get("phone_number", "N/A"),
+            "home_address": doc.get("home_address", "N/A"),
+            "have_car": doc.get("have_car", "No"),
+            "role": ", ".join(doc.get("role", [])) if isinstance(doc.get("role"), list) else doc.get("role", "N/A"),
+            "skills": ", ".join(doc.get("skills", [])) if isinstance(doc.get("skills"), list) else doc.get("skills", "N/A"),
+            "availability": ", ".join(doc.get("availability", [])) if isinstance(doc.get("availability"), list) else doc.get("availability", "N/A"),
+            "certificates": ", ".join(
+                [
+                    f"{cert} (Issued: {info.get('issue_date', 'N/A')}, Exp: {info.get('expiration_date', 'N/A')})"
+                    for cert, info in doc.get("certificates", {}).items()
+                ]
+            ) if isinstance(doc.get("certificates"), dict) else "None",
+            "rating": doc.get("rating", "N/A")
+        }
+        for doc in (d.to_dict() for d in employees_ref.stream())  # Efficient fetching
     ]
 
-    # Convert to DataFrame and display in the specified order
+    # Convert data to DataFrame for better UI handling
     if employee_data:
         df = pd.DataFrame(employee_data)
 
-        # Ensure the columns are displayed in the desired order
+        # Define the column order
+        column_order = [
+            "worker_id", "first_name", "middle_name", "sur_name", "phone_number", "home_address", "have_car",
+            "role", "skills", "certificates", "availability", "rating"
+        ]
         df = df[column_order]
 
-        st.dataframe(df)
+        # ✅ Sorting & Filtering UI
+        sort_col = st.selectbox("Sort by:", column_order, index=0)
+        sort_order = st.radio("Sort Order", ["Ascending", "Descending"], horizontal=True)
+        df = df.sort_values(by=sort_col, ascending=(sort_order == "Ascending"))
+
+        # ✅ Search Feature
+        search_query = st.text_input("Search Employees (by name or ID)")
+        if search_query:
+            df = df[
+                df["worker_id"].str.contains(search_query, case=False, na=False) |
+                df["first_name"].str.contains(search_query, case=False, na=False) |
+                df["sur_name"].str.contains(search_query, case=False, na=False)
+            ]
+
+        # ✅ Display the table with better formatting
+        st.dataframe(df, use_container_width=True)
     else:
-        st.write("No employees found.")
-
-
-
-#----------------------------------------------------------------------------------------
-
-
-# ✅ Streamlit UI for Adding a Job Site
-def add_job_site_form():
-    st.header("Add Job Site")
-
-    site_id = f"SITE{random.randint(1000, 9999)}"  # Auto-generated site ID
-    st.write(f"Generated Site ID: {site_id}")  # Debugging output
-    
-    site_name = st.text_input("Site Name")
-    site_company = st.text_input("Site Company")
-    site_superintendent = st.text_input("Site Superintendent")
-    site_contact_number = st.text_input("Site Contact Number")
-    address = st.text_input("Site Address (Use Google Maps for accuracy)")
-    
-    # ✅ Job Site Status Selection
-    job_status = st.selectbox("Job Site Status", ["Active", "Inactive", "Completed"])
-    
-    # ✅ Date Selection with Calendar Widget
-    work_start_date = st.date_input("Work Start Date")
-    work_end_date = st.date_input("Work End Date")
-    
-    # ✅ Required roles selection with toggle
-    st.subheader("Required Roles")
-    required_roles = {}
-    roles = ["Cleaner", "Labour", "Painter"]
-    
-    for role in roles:
-        toggle = st.toggle(f"Enable {role}", key=f"toggle_{role}")
-        if toggle:
-            st.write(f"### {role}")
-            work_schedule = st.multiselect(
-                f"Work Schedule for {role}",
-                ["7:00-15:30", "14:00-22:00", "22:00-06:00"],
-                key=f"schedule_{role}"
-            )
-            num_workers = st.number_input(f"Number of {role}s Required", min_value=0, step=1, key=f"workers_{role}")
-            
-            required_roles[role] = {"work_schedule": work_schedule, "num_workers": num_workers}
-    
-    if st.button("Add Job Site"):
-        try:
-            job_site_data = {
-                "site_id": site_id,
-                "site_name": site_name,
-                "site_company": site_company,
-                "site_superintendent": site_superintendent,
-                "site_contact_number": site_contact_number,
-                "address": address,
-                "job_status": job_status,
-                "work_start_date": work_start_date.strftime('%Y-%m-%d'),
-                "work_end_date": work_end_date.strftime('%Y-%m-%d'),
-                "required_roles": required_roles
-            }
-            
-            doc_ref = job_sites_ref.document(site_id)  # Manually create document reference
-            doc_ref.set(job_site_data)  # Store data explicitly
-
-            # Verify if the document exists after writing
-            if doc_ref.get().exists:
-                st.success(f"Job Site {site_name} added with ID: {site_id}")
-            else:
-                st.error("Firestore write operation completed, but document not found.")
-        except Exception as e:
-            st.error(f"Error adding job site: {str(e)}")
-
-
-#-----------------------------------------------------------------
-
-
-# ✅ Streamlit UI for Running Assignments
-def do_assignments():
-    st.header("Run Assignments")
-    st.write("Click the button below to run the assignment process and match employees to job sites. This will also remove old assignments to prevent duplicates.")
-    
-    if st.button("Run Assignments"):
-        with st.spinner("Fetching new Employees and Job Sites..."):
-            time.sleep(5)  # Simulate loading effect
-        with st.spinner("Updating assignments..."):
-            time.sleep(2)  # Simulate loading effect
-            
-            # ✅ Step 1: Delete Old Assignments
-            try:
-                old_assignments = assignments_ref.stream()
-                for doc in old_assignments:
-                    doc.reference.delete()
-                print("🗑️ Old assignments deleted successfully.")
-            except Exception as e:
-                st.error(f"❌ Error deleting old assignments: {e}")
-                return
-            
-            # ✅ Step 2: Run assign.py in the same Python environment
-            python_executable = sys.executable  # Ensures it runs in the same environment as Streamlit
-            process = subprocess.run([python_executable, "assign.py"], capture_output=True, text=True)
-            
-            if process.returncode == 0:
-                st.success("✅ Successfully executed assign.py, updated assignments, and removed duplicates!")
-            else:
-                st.error(f"❌ Error running assign.py: {process.stderr}")
-    
-        with st.spinner("Loading the new assigments, please wait..."):
-            time.sleep(2)  # Simulate loading effect
-
-        view_assignments() 
-    
-#----------------------------------------------------------------------------------------
-
-# ✅ Streamlit UI for Viewing Job Sites
-def view_job_sites():
-    st.header("View Job Sites")
-
-    # Fetch job sites from Firestore
-    docs = job_sites_ref.stream()
-
-    # Prepare data for the table
-    job_sites_data = []
-    for doc in docs:
-        job_site = doc.to_dict()
-
-        # Ensure essential fields exist, otherwise assign a default value
-        job_site_data = {
-            "Site ID": job_site.get("site_id", "N/A"),
-            "Job Status": job_site.get("job_status", "N/A"),
-            "Work Start Date": job_site.get("work_start_date", "N/A"),
-            "Work End Date": job_site.get("work_end_date", "N/A"),
-            "Site Name": job_site.get("site_name", "N/A"),
-            "Company": job_site.get("site_company", "N/A"),
-            "Superintendent": job_site.get("site_superintendent", "N/A"),
-            "Contact Number": job_site.get("site_contact_number", "N/A"),
-            "Address": job_site.get("address", "N/A"),
-        }
-
-        # ✅ Calculate total number of required workers
-        required_roles = job_site.get("required_roles", {})
-        total_workers = 0
-        formatted_roles = []
-
-        for role, details in required_roles.items():
-            num_workers = details.get("num_workers", 0)
-            schedule = ", ".join(details.get("work_schedule", [])) if "work_schedule" in details else "N/A"
-            formatted_roles.append(f"{role} ({num_workers} workers, {schedule})")
-
-            # Accumulate total workers
-            total_workers += num_workers
-
-        job_site_data["# Required Workers"] = total_workers  # Add computed num_workers
-        job_site_data["Required Roles"] = ", ".join(formatted_roles) if formatted_roles else "N/A"
-
-        job_sites_data.append(job_site_data)
-
-    # Convert data to a DataFrame
-    job_sites_df = pd.DataFrame(job_sites_data)
-
-    # Define the correct column order
-    column_order = ["Site ID", "Job Status", "Work Start Date", "Work End Date", "Site Name", "Company", "Superintendent", 
-                    "Contact Number", "Address", "# Required Workers", "Required Roles"]
-
-    # Ensure only existing columns are displayed
-    job_sites_df = job_sites_df[column_order]
-
-    # Display the data in a table format
-    st.dataframe(job_sites_df)
-
-
-#--------------------------------------------
-
-
-def view_assignments():
-    st.header("View Assignments")
-
-    # Fetch assignments from Firestore
-    docs = assignments_ref.stream()
-
-    # Fetch all employees as a dictionary {worker_id: employee_data}
-    employees_dict = {doc.to_dict().get("worker_id"): doc.to_dict() for doc in employees_ref.stream()}
-
-    # Prepare data for the table
-    assignments_data = []
-    
-    for doc in docs:
-        assignment = doc.to_dict()
-
-        # 🔹 Fetch job site details using job_site_id
-        site_id = assignment.get("job_site_id", "N/A")
-        site_doc = job_sites_ref.document(site_id).get()
-        site_data = site_doc.to_dict() if site_doc.exists else {}
-
-        # 🔹 Fetch employee details using employee_id
-        employee_id = assignment.get("employee_id", "N/A")
-        employee_data = employees_dict.get(employee_id, {})
-
-        if not employee_data:
-            print(f"⚠️ Employee {employee_id} not found in Firestore!")  # Debugging
-
-        # 🔹 Retrieve distance from assignment document
-        distance = assignment.get("distance", "N/A")  # ✅ Fetch Distance from Assignments Collection
-
-        # 🔹 Construct a single row for the table with safe default values
-        assignment_data = {
-            "Site Name": site_data.get("site_name", "N/A"),
-            "Company": site_data.get("site_company", "N/A"),
-            "Address": site_data.get("address", "N/A"),
-            "Num Workers": sum([details.get("num_workers", 0) for details in site_data.get("required_roles", {}).values()]) if site_data.get("required_roles") else 0,
-            "Full Name": f"{employee_data.get('first_name', 'N/A')} {employee_data.get('middle_name', '')} {employee_data.get('sur_name', 'N/A')}".strip(),
-            "Phone Number": employee_data.get("phone_number", "N/A"),
-            "Home Address": employee_data.get("home_address", "N/A"),
-            "Has Car": employee_data.get("have_car", "N/A"),
-            "Role": assignment.get("role", "N/A"),
-            "Skills": ", ".join(employee_data.get("skills", [])) if isinstance(employee_data.get("skills"), list) else "N/A",
-            "Certificates": ", ".join(employee_data.get("certificates", [])) if isinstance(employee_data.get("certificates"), list) else "N/A",
-            "Availability": ", ".join(employee_data.get("availability", [])) if isinstance(employee_data.get("availability"), list) else "N/A",
-            "Rating": employee_data.get("rating", "N/A"),
-            "Distance (km)": f"{distance:.2f} km" if isinstance(distance, (int, float)) else "N/A",  # ✅ Formatted Distance
-        }
-
-        assignments_data.append(assignment_data)
-
-    # Convert data to a DataFrame
-    assignments_df = pd.DataFrame(assignments_data)
-
-    # Define expected column order with formatted names
-    formatted_columns = ["Site Name", "Company", "Address", "Num Workers", "Full Name", "Phone Number", 
-                         "Home Address", "Has Car", "Role", "Skills", "Certificates", "Availability", "Rating", "Distance (km)"]
-
-    # ✅ Ensure only valid columns are selected
-    existing_columns = [col for col in formatted_columns if col in assignments_df.columns]
-    assignments_df = assignments_df[existing_columns] if existing_columns else pd.DataFrame(columns=formatted_columns)
-
-    # ✅ Sort the DataFrame alphabetically by "Site Name"
-    assignments_df = assignments_df.sort_values(by="Site Name", ascending=True)
-
-    # ✅ Display the final table with formatted column names
-    st.dataframe(assignments_df)
-
-
+        st.info("No employees found.")
 
 
 #----------------------------------------------------------------------------------------
@@ -384,40 +149,46 @@ def view_assignments():
 # ✅ Streamlit UI for Finding, Updating, and Deleting an Employee
 def find_and_update_employee():
     st.header("Find, Update, or Delete Employee")
-    
-    if st.button("New Search"):
+
+    # Reset search if "New Search" is clicked
+    if st.button("🔄 New Search"):
         st.session_state.pop("selected_employee", None)
         st.session_state.pop("search_term", None)
         st.rerun()
-    
-    search_term = st.text_input("Search by Worker ID, Phone Number, First Name, or Last Name", value=st.session_state.get("search_term", "")).strip().lower()
-    search_results = []
 
-    if st.button("Search"):
+    # Search input
+    search_term = st.text_input(
+        "🔍 Search by Worker ID, Phone Number, First Name, or Last Name",
+        value=st.session_state.get("search_term", "")
+    ).strip().lower()
+
+    search_results = []
+    if search_term:
         st.session_state["search_term"] = search_term
-        query_ref = employees_ref.stream()
-        
-        for doc in query_ref:
+        for doc in employees_ref.stream():
             employee = doc.to_dict()
-            
             if any(search_term in str(employee.get(field, "")).lower() for field in ["worker_id", "phone_number", "first_name", "sur_name"]):
-                employee["doc_id"] = doc.id  # Store Firestore document ID for updates
+                employee["doc_id"] = doc.id  # ✅ Store Firestore document ID
                 search_results.append(employee)
 
-        if search_results:
-            selected_employee = st.selectbox(
-                "Select Employee to Edit or Delete", 
-                search_results, 
-                format_func=lambda x: f"{x['first_name']} {x['sur_name']} ({x['worker_id']})"
-            )
-            if selected_employee:
-                st.session_state["selected_employee"] = selected_employee
-    
+    # Show search results
+    if search_results:
+        selected_employee = st.selectbox(
+            "👤 Select Employee to Edit or Delete",
+            search_results,
+            format_func=lambda x: f"{x.get('first_name', 'N/A')} {x.get('sur_name', 'N/A')} ({x.get('worker_id', 'N/A')})"
+        )
+
+        if selected_employee:
+            st.session_state["selected_employee"] = selected_employee
+
+    # Show update form if an employee is selected
     if "selected_employee" in st.session_state:
         update_employee_form(st.session_state["selected_employee"])
-        
-        # Delete Employee Button
-        if st.button("Delete Employee"):
+
+        # ✅ Confirm deletion
+        if st.button("❌ Delete Employee", help="This action cannot be undone!"):
+         
             try:
                 doc_id = st.session_state["selected_employee"]["doc_id"]
                 employees_ref.document(doc_id).delete()
@@ -469,48 +240,186 @@ def update_employee_form(employee):
         except Exception as e:
             st.error(f"Error updating employee: {str(e)}")
 
+#----------------------------------------------------------------------------------------
+
+
+# ✅ Streamlit UI for Adding a Job Site
+def add_job_site_form():
+    st.header("🏗️ Add Job Site")
+
+    with st.form(key="add_job_site_form"):
+        site_id = f"SITE{random.randint(1000, 9999)}"  # Auto-generated Site ID
+        st.write(f"📌 Generated Site ID: `{site_id}`")  # Debugging output
+
+        site_name = st.text_input("🏢 Site Name")
+        site_company = st.text_input("🏗️ Site Company")
+        site_superintendent = st.text_input("👷 Superintendent")
+        site_contact_number = st.text_input("📞 Contact Number")
+        address = st.text_input("📍 Site Address (Use Google Maps for accuracy)")
+
+        # ✅ Job Site Status Selection
+        job_status = st.selectbox("📌 Job Site Status", ["Active", "Inactive", "Completed"])
+
+        # ✅ Date Selection with Calendar Widget
+        work_start_date = st.date_input("📅 Work Start Date")
+        work_end_date = st.date_input("📅 Work End Date")
+
+        # ✅ Required roles selection
+        st.subheader("🛠️ Required Roles")
+        required_roles = {}
+        roles = ["Cleaner", "Labour", "Painter"]
+
+        for role in roles:
+            with st.expander(f"⚙️ {role}"):
+                work_schedule = st.multiselect(
+                    f"🕒 Work Schedule for {role}",
+                    ["7:00-15:30", "14:00-22:00", "22:00-06:00"],
+                    key=f"schedule_{role}"
+                )
+                num_workers = st.number_input(
+                    f"👥 Number of {role}s Required",
+                    min_value=0, step=1, key=f"workers_{role}"
+                )
+                if num_workers > 0:
+                    required_roles[role] = {"work_schedule": work_schedule, "num_workers": num_workers}
+
+        submit_button = st.form_submit_button("✅ Add Job Site")
+
+    if submit_button:
+        if not site_name or not site_company or not site_superintendent or not site_contact_number or not address:
+            st.error("❌ Please fill in all required fields.")
+            return
+        
+        try:
+            job_site_data = {
+                "site_id": site_id,
+                "site_name": site_name.strip(),
+                "site_company": site_company.strip(),
+                "site_superintendent": site_superintendent.strip(),
+                "site_contact_number": site_contact_number.strip(),
+                "address": address.strip(),
+                "job_status": job_status,
+                "work_start_date": work_start_date.strftime('%Y-%m-%d'),
+                "work_end_date": work_end_date.strftime('%Y-%m-%d'),
+                "required_roles": required_roles
+            }
+            
+            doc_ref = job_sites_ref.document(site_id)
+            doc_ref.set(job_site_data)
+
+            # ✅ Verify if Firestore has stored the document correctly
+            if doc_ref.get().exists:
+                st.success(f"✅ Job Site **{site_name}** added successfully with ID: `{site_id}`")
+            else:
+                st.error("❌ Firestore write operation completed, but document not found.")
+        except Exception as e:
+            st.error(f"❌ Error adding job site: {str(e)}")
 
 
 #----------------------------------------------------------------------------------------
 
+def view_job_sites():
+    st.header("🏗️ View Job Sites")
+
+    # Fetch job sites from Firestore efficiently
+    job_sites_data = [
+        {
+            "Site ID": doc.get("site_id", "N/A"),
+            "Job Status": doc.get("job_status", "N/A"),
+            "Work Start Date": doc.get("work_start_date", "N/A"),
+            "Work End Date": doc.get("work_end_date", "N/A"),
+            "Site Name": doc.get("site_name", "N/A"),
+            "Company": doc.get("site_company", "N/A"),
+            "Superintendent": doc.get("site_superintendent", "N/A"),
+            "Contact Number": doc.get("site_contact_number", "N/A"),
+            "Address": doc.get("address", "N/A"),
+            "# Required Workers": sum(
+                details.get("num_workers", 0) for details in doc.get("required_roles", {}).values()
+            ),
+            "Required Roles": ", ".join([
+                f"{role} ({details.get('num_workers', 0)} workers, {', '.join(details.get('work_schedule', []))})"
+                for role, details in doc.get("required_roles", {}).items()
+            ]) if doc.get("required_roles") else "N/A"
+        }
+        for doc in (d.to_dict() for d in job_sites_ref.stream())  # Optimized fetching
+    ]
+
+    if job_sites_data:
+        df = pd.DataFrame(job_sites_data)
+
+        # Define column order
+        column_order = [
+            "Site ID", "Job Status", "Work Start Date", "Work End Date", "Site Name", "Company",
+            "Superintendent", "Contact Number", "Address", "# Required Workers", "Required Roles"
+        ]
+        df = df[column_order]
+
+        # ✅ Status Filter
+        status_filter = st.selectbox("🔍 Filter by Job Site Status:", ["All", "Active", "Inactive", "Completed"], index=0)
+        if status_filter != "All":
+            df = df[df["Job Status"] == status_filter]
+
+        # ✅ Sorting UI
+        sort_col = st.selectbox("🔀 Sort by:", column_order, index=0)
+        sort_order = st.radio("⬆️⬇️ Sort Order", ["Ascending", "Descending"], horizontal=True)
+        df = df.sort_values(by=sort_col, ascending=(sort_order == "Ascending"))
+
+        # ✅ Search Feature
+        search_query = st.text_input("🔍 Search Job Sites (by Site Name, ID, or Company)")
+        if search_query:
+            df = df[
+                df["Site ID"].str.contains(search_query, case=False, na=False) |
+                df["Site Name"].str.contains(search_query, case=False, na=False) |
+                df["Company"].str.contains(search_query, case=False, na=False)
+            ]
+
+        # ✅ Display DataFrame with enhanced UI
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("❌ No job sites found.")
+
+
+#-----------------------------------------------------------------
+
+
 # ✅ Streamlit UI for Finding and Updating a Job Site
 def find_and_update_job_site():
-    st.header("Find and Update Job Site")
+    st.header("🏗️ Find and Update Job Site")
     
-    if st.button("New Search"):
+    if st.button("🔄 New Search"):
         st.session_state.pop("selected_job_site", None)
         st.session_state.pop("search_term_job", None)
         st.rerun()
     
-    search_term = st.text_input("Search by Site ID, Site Name, Company, or Address", value=st.session_state.get("search_term_job", "")).strip().lower()
+    search_term = st.text_input(
+        "🔍 Search by Site ID, Site Name, Company, or Address",
+        value=st.session_state.get("search_term_job", "")
+    ).strip().lower()
+
     search_results = []
-
-    if st.button("Search"):
+    if search_term:
         st.session_state["search_term_job"] = search_term
-        query_ref = job_sites_ref.stream()
         
-        for doc in query_ref:
-            job_site = doc.to_dict()
-            
-            if any(search_term in str(job_site.get(field, "")).lower() for field in ["site_id", "site_name", "site_company", "address"]):
-                job_site["doc_id"] = doc.id  # Store Firestore document ID for updates
-                search_results.append(job_site)
-
-        if search_results:
-            selected_job_site = st.selectbox(
-                "Select Job Site to Edit", 
-                search_results, 
-                format_func=lambda x: f"{x['site_name']} ({x['site_id']})"
-            )
-            if selected_job_site:
-                st.session_state["selected_job_site"] = selected_job_site
+        search_results = [
+            {**doc.to_dict(), "doc_id": doc.id}
+            for doc in job_sites_ref.stream()
+            if any(search_term in str(doc.to_dict().get(field, "")).lower() for field in ["site_id", "site_name", "site_company", "address"])
+        ]
+    
+    if search_results:
+        selected_job_site = st.selectbox(
+            "🏗️ Select Job Site to Edit",
+            search_results,
+            format_func=lambda x: f"{x.get('site_name', 'N/A')} ({x.get('site_id', 'N/A')})"
+        )
+        
+        if selected_job_site:
+            st.session_state["selected_job_site"] = selected_job_site
     
     if "selected_job_site" in st.session_state:
-        update_job_site_form(st.session_state["selected_job_site"]) 
-
+        update_job_site_form(st.session_state["selected_job_site"])
 
 #----------------------------------------------------------------------------------------
-
 
 # ✅ Streamlit UI for Updating Job Site Details
 def update_job_site_form(job_site):
@@ -542,6 +451,118 @@ def update_job_site_form(job_site):
             st.session_state.pop("selected_job_site", None)
         except Exception as e:
             st.error(f"Error updating job site: {str(e)}")
+
+#----------------------------------------------------------------------------------------
+
+
+def view_assignments():
+    st.header("📋 View Assignments")
+
+    # Fetch assignments from Firestore
+    assignments_data = [doc.to_dict() for doc in assignments_ref.stream()]
+
+    # Fetch all employees as a dictionary {worker_id: employee_data}
+    employees_dict = {doc.to_dict().get("worker_id"): doc.to_dict() for doc in employees_ref.stream()}
+
+    # Prepare data for the table
+    formatted_assignments = []
+    
+    for assignment in assignments_data:
+        site_id = assignment.get("job_site_id", "N/A")
+        site_doc = job_sites_ref.document(site_id).get()
+        site_data = site_doc.to_dict() if site_doc.exists else {}
+
+        employee_id = assignment.get("employee_id", "N/A")
+        employee_data = employees_dict.get(employee_id, {})
+
+        distance = assignment.get("distance", "N/A")  # ✅ Fetch Distance from Assignments Collection
+
+        # Construct assignment record with safe default values
+        formatted_assignments.append({
+            "Site Name": site_data.get("site_name", "N/A"),
+            "Company": site_data.get("site_company", "N/A"),
+            "Address": site_data.get("address", "N/A"),
+            "Num Workers": sum(
+                details.get("num_workers", 0) for details in site_data.get("required_roles", {}).values()
+            ) if site_data.get("required_roles") else 0,
+            "Full Name": f"{employee_data.get('first_name', 'N/A')} {employee_data.get('middle_name', '')} {employee_data.get('sur_name', 'N/A')}",
+            "Phone Number": employee_data.get("phone_number", "N/A"),
+            "Home Address": employee_data.get("home_address", "N/A"),
+            "Has Car": employee_data.get("have_car", "N/A"),
+            "Role": assignment.get("role", "N/A"),
+            "Skills": ", ".join(employee_data.get("skills", [])) if isinstance(employee_data.get("skills"), list) else "N/A",
+            "Certificates": ", ".join(employee_data.get("certificates", [])) if isinstance(employee_data.get("certificates"), list) else "N/A",
+            "Availability": ", ".join(employee_data.get("availability", [])) if isinstance(employee_data.get("availability"), list) else "N/A",
+            "Rating": employee_data.get("rating", "N/A"),
+            "Distance (km)": f"{distance:.2f} km" if isinstance(distance, (int, float)) else "N/A",
+        })
+
+    # Convert data to DataFrame
+    df = pd.DataFrame(formatted_assignments)
+
+    # Define expected column order
+    column_order = [
+        "Site Name", "Company", "Address", "Num Workers", "Full Name", "Phone Number", 
+        "Home Address", "Has Car", "Role", "Skills", "Certificates", "Availability", "Rating", "Distance (km)"
+    ]
+    
+    if not df.empty:
+        df = df[column_order]
+        
+        # ✅ Sorting Feature
+        sort_col = st.selectbox("🔀 Sort by:", column_order, index=0)
+        sort_order = st.radio("⬆️⬇️ Sort Order", ["Ascending", "Descending"], horizontal=True)
+        df = df.sort_values(by=sort_col, ascending=(sort_order == "Ascending"))
+
+        # ✅ Search Feature
+        search_query = st.text_input("🔍 Search Assignments (by Site Name, Employee, or Role)")
+        if search_query:
+            df = df[
+                df["Site Name"].str.contains(search_query, case=False, na=False) |
+                df["Full Name"].str.contains(search_query, case=False, na=False) |
+                df["Role"].str.contains(search_query, case=False, na=False)
+            ]
+
+        # ✅ Display DataFrame with enhanced UI
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("❌ No assignments found.")
+
+
+#----------------------------------------------------------------------------------------
+
+import time
+import sys
+import subprocess
+
+def do_assignments():
+    st.header("🔄 Run Assignments")
+    st.write("Click below to run the assignment process and match employees to job sites.")
+
+    if st.button("Run Assignments"):
+        with st.spinner("🗑️ Deleting old assignments..."):
+            try:
+                old_assignments = assignments_ref.stream()
+                batch = db.batch()
+                for doc in old_assignments:
+                    batch.delete(doc.reference)
+                batch.commit()
+                time.sleep(2)  # Allow Firestore sync
+                #st.success("✅ Old assignments deleted successfully!")
+            except Exception as e:
+                st.error(f"❌ Error deleting assignments: {e}")
+                return
+
+        with st.spinner("⚡ Running assignment process..."):
+            python_executable = sys.executable  # Ensure it runs in the correct environment
+            process = subprocess.run([python_executable, "assign.py"], capture_output=True, text=True)
+
+        with st.spinner("🚀 Updating assignments..."):
+            time.sleep(3)  # Allow data to sync before showing assignments
+            st.success("✅ Assignments have been updated!")
+
+        # ✅ Call view_assignments() to refresh UI
+        view_assignments()
 
 
 #----------------------------------------------------------------------------------------
@@ -579,6 +600,9 @@ def notify_employees():
             st.warning("⚠️ Please enter a phone number and message.")
 
 
+
+
+
 #----------------------------------------------------------------------------------------
 
 
@@ -593,13 +617,8 @@ db = firestore.client()
 users_ref = db.collection("users")  # Stores user authentication & role info
 employees_ref = db.collection("employees")  # Stores employee profile data
 
-
 def generate_worker_id():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-
-
-#----------------------------------------------------------------------------------------
-
 
 # ✅ Function to Register a User and Add to Employees Database
 def register_user(email, password):
@@ -679,25 +698,26 @@ def login_user(email, password):
 
 #----------------------------------------------------------------------------------------
 
-# ✅ Sidebar Navigation
+
 def sidebar_menu():
     st.sidebar.header("📋 Navigation")
-
-    if st.session_state["user_role"] == "admin":
-
-        st.sidebar.image("optishift_logo.png", use_container_width=True)
-        if st.sidebar.button("👥 Employees"):
-            st.session_state["selected_section"] = "employees"
-        if st.sidebar.button("🏗️ Job Sites"):
-            st.session_state["selected_section"] = "job_sites"
-        if st.sidebar.button("📋 Assignments"):
-            st.session_state["selected_section"] = "assignments"
+    st.sidebar.image("optishift_logo.png", use_container_width=True)
+    
+    user_role = st.session_state.get("user_role", "employee")
+    
+    if user_role == "admin":
+        menu_options = {
+            "👥 Employees": "employees",
+            "🏗️ Job Sites": "job_sites",
+            "📋 Assignments": "assignments"
+        }
+        selected_option = st.sidebar.radio("Select an option:", list(menu_options.keys()))
+        if selected_option:
+            st.session_state["selected_section"] = menu_options[selected_option]
     else:
-        st.sidebar.image("optishift_logo.png", use_container_width=True)
         if st.sidebar.button("📝 Update Profile"):
-            
             st.session_state["selected_section"] = "profile"
-
+    
     st.sidebar.write("---")
     if st.sidebar.button("🚪 Logout"):
         st.session_state.clear()
@@ -711,96 +731,100 @@ def sidebar_menu():
 def update_profile():
     st.subheader("📝 Update Your Profile")
 
-    user_id = st.session_state["user_id"]
+    if "selected_section" in st.session_state and st.session_state["selected_section"] != "profile":
+        return  # Ensures the function only runs when the correct section is selected
+    
+    user_id = st.session_state.get("user_id")
+    if not user_id:
+        st.error("❌ User ID not found. Please log in again.")
+        return
+
     employee_doc = employees_ref.document(user_id).get()
 
     if employee_doc.exists:
         employee = employee_doc.to_dict()
 
-        # Ensure Worker ID exists, if missing assign one
         if "worker_id" not in employee or not employee["worker_id"]:
             worker_id = generate_worker_id()
             employees_ref.document(user_id).update({"worker_id": worker_id})
         else:
             worker_id = employee["worker_id"]
 
-        first_name = st.text_input("First Name", employee["first_name"])
-        middle_name = st.text_input("Middle Name", employee["middle_name"])
-        sur_name = st.text_input("Surname", employee["sur_name"])
-        phone_number = st.text_input("Phone Number", employee["phone_number"])
-        home_address = st.text_input("Home Address", employee["home_address"])
-        have_car = st.selectbox("Do you have a car?", ["Yes", "No"], index=["Yes", "No"].index(employee["have_car"]))
-        role = st.multiselect("Role", ["Cleaner", "Labour", "Painter"], default=employee["role"])
-        availability = st.multiselect("Availability", ["7:00-15:30", "14:00-22:00", "22:00-06:00"], default=employee["availability"])
-        skills = st.multiselect("Skills", ["Boomlift", "Scissors Lift", "Forklift"], default=employee["skills"])
-
-        # ✅ Ensure certificates are stored as a dictionary (Fix for AttributeError)
-        certificates = employee.get("certificates", {})
-
-        if isinstance(certificates, list):
-            # Convert list to dictionary format (assume previous format only contained certificate names)
-            certificates = {cert: {"issue_date": "2024-01-01", "expiration_date": "2026-01-01"} for cert in certificates}
-
-        # ✅ Handling Certificate Issue & Expiration Dates
-        st.subheader("📜 Certifications")
-        updated_certificates = {}
-
-        for cert in ["Working at Heights", "4 Steps", "WHMIS"]:
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                cert_selected = st.checkbox(cert, value=(cert in certificates))
-            with col2:
-                issue_date = st.date_input(
-                    f"Issue Date for {cert}", 
-                    value=pd.to_datetime(certificates.get(cert, {}).get("issue_date", "2024-01-01")),
-                    disabled=not cert_selected
-                )
-            with col3:
-                expiration_date = st.date_input(
-                    f"Expiration Date for {cert}", 
-                    value=pd.to_datetime(certificates.get(cert, {}).get("expiration_date", "2026-01-01")),
-                    disabled=not cert_selected
-                )
+        with st.form("update_profile_form"):
+            first_name = st.text_input("First Name", employee.get("first_name", "").strip())
+            middle_name = st.text_input("Middle Name", employee.get("middle_name", "").strip())
+            sur_name = st.text_input("Surname", employee.get("sur_name", "").strip())
+            phone_number = st.text_input("Phone Number", employee.get("phone_number", "").strip())
+            home_address = st.text_input("Home Address", employee.get("home_address", "").strip())
+            have_car = st.selectbox("Do you have a car?", ["Yes", "No"], index=["Yes", "No"].index(employee.get("have_car", "No")))
+            role = st.multiselect("Role", ["Cleaner", "Labour", "Painter"], default=employee.get("role", []))
+            availability = st.multiselect("Availability", ["7:00-15:30", "14:00-22:00", "22:00-06:00"], default=employee.get("availability", []))
+            skills = st.multiselect("Skills", ["Boomlift", "Scissors Lift", "Forklift"], default=employee.get("skills", []))
             
-            if cert_selected:
-                updated_certificates[cert] = {
-                    "issue_date": issue_date.strftime("%Y-%m-%d"),
-                    "expiration_date": expiration_date.strftime("%Y-%m-%d")
-                }
+            st.subheader("📜 Certifications")
+            updated_certificates = {}
 
-        # ✅ Check if rating is locked (employees should only set rating once)
-        rating_locked = employee.get("rating_locked", False)
+            certificates = employee.get("certificates", {})
+            if isinstance(certificates, list):
+                certificates = {cert: {"issue_date": "2024-01-01", "expiration_date": "2026-01-01"} for cert in certificates}
 
-        if not rating_locked:
-            rating = st.slider("Employee Rating (One-Time Auto-Evaluation)", min_value=0.0, max_value=5.0, value=float(employee["rating"]), step=0.1)
-            st.warning("⚠️ You can only set your rating once.")
-        else:
-            rating = employee["rating"]  # Keep it unchanged
-            st.info(f"⭐ Your current rating: **{rating}** (Auto-evaluation complete)")
-
-        if st.button("Update Profile"):
+            for cert in ["Working at Heights", "4 Steps", "WHMIS"]:
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    cert_selected = st.checkbox(cert, value=(cert in certificates))
+                with col2:
+                    issue_date = st.date_input(
+                        f"Issue Date for {cert}",
+                        value=pd.to_datetime(certificates.get(cert, {}).get("issue_date", "2024-01-01")),
+                        disabled=not cert_selected
+                    )
+                with col3:
+                    expiration_date = st.date_input(
+                        f"Expiration Date for {cert}",
+                        value=pd.to_datetime(certificates.get(cert, {}).get("expiration_date", "2026-01-01")),
+                        disabled=not cert_selected
+                    )
+                
+                if cert_selected:
+                    updated_certificates[cert] = {
+                        "issue_date": issue_date.strftime("%Y-%m-%d"),
+                        "expiration_date": expiration_date.strftime("%Y-%m-%d")
+                    }
+            
+            rating_locked = employee.get("rating_locked", False)
+            if not rating_locked:
+                rating = st.slider("Employee Rating (One-Time Auto-Evaluation)", min_value=0.0, max_value=5.0, value=float(employee.get("rating", 3.0)), step=0.1)
+                st.warning("⚠️ You can only set your rating once.")
+            else:
+                rating = employee.get("rating", "N/A")
+                st.info(f"⭐ Your current rating: **{rating}** (Auto-evaluation complete)")
+            
+            submit_button = st.form_submit_button("✅ Update Profile")
+        
+        if submit_button:
             updated_data = {
                 "worker_id": worker_id,
-                "first_name": first_name,
-                "middle_name": middle_name,
-                "sur_name": sur_name,
-                "phone_number": phone_number,
-                "home_address": home_address,
+                "first_name": first_name.strip(),
+                "middle_name": middle_name.strip(),
+                "sur_name": sur_name.strip(),
+                "phone_number": phone_number.strip(),
+                "home_address": home_address.strip(),
                 "have_car": have_car,
                 "role": role,
                 "availability": availability,
                 "skills": skills,
-                "certificates": updated_certificates  # ✅ Store updated certificates with dates
+                "certificates": updated_certificates
             }
-
-            # ✅ Allow rating update only if it was never set before
+            
             if not rating_locked:
                 updated_data["rating"] = rating
-                updated_data["rating_locked"] = True  # ✅ Lock the rating after first update
+                updated_data["rating_locked"] = True
 
             try:
                 employees_ref.document(user_id).update(updated_data)
                 st.success("✅ Profile updated successfully!")
+                st.session_state["profile_updated"] = True
+                st.rerun()
             except Exception as e:
                 st.error(f"❌ Error updating profile: {str(e)}")
 
@@ -926,27 +950,31 @@ def authentication_ui():
 def main():
     authentication_ui()
 
-    # ✅ Show Welcome Screen ONLY if user is NOT authenticated
     if not st.session_state.get("authenticated"):       
-        return  # ✅ Stop execution here to prevent navigation showing
+        return  # Stop execution if not authenticated
 
-    # ✅ Show OptiShift Logo for Employees Until Profile is Updated
+    if "selected_section" not in st.session_state:
+        st.session_state["selected_section"] = None
+
     if st.session_state.get("show_logo_after_auth", False) and not st.session_state.get("profile_updated", False):
-        if st.session_state["user_role"] == "employee":  # ✅ Show only for employees
+        if st.session_state["user_role"] == "employee":
             st.image("optishift_logo.png", use_container_width=True)
             st.title("Welcome to OptiShift!")
             st.subheader("Your account has been successfully created! Please update your profile.")
-        return  # ✅ Prevents moving forward until profile update is done
+            if st.button("Update Profile Now"):
+                st.session_state["selected_section"] = "profile"
+                st.session_state["show_logo_after_auth"] = False  # Ensure the logo screen doesn't show again
+                st.rerun()
+    else:
+        sidebar_menu()
 
-    # ✅ Show navigation menu AFTER authentication and logo display
-    sidebar_menu()
-
-    # ✅ Ensure logo does NOT appear on the admin dashboard
-    if st.session_state.get("selected_section") == "profile":
-        update_profile()
-    elif st.session_state["user_role"] == "admin":
-        main_view()  # ✅ Admin sees full menu
-
+        if st.session_state.get("selected_section") == "profile":
+            st.write("### Profile Update")  # Ensures content is loaded
+            update_profile()
+        elif st.session_state["user_role"] == "admin":
+            main_view()
+        else:
+            st.write("Welcome! Please select an option from the sidebar.")
 
 
 # ✅ Run App
