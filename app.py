@@ -24,21 +24,21 @@ db = firestore.client()
 
 #----------------------------------------------------------------------------------------
 
-try:
-    db.collection("test").document("debug").set({"message": "Hello, Firestore!"})
-    st.success("✅ Firestore write test successful!")
-except Exception as e:
-    st.error(f"🚨 Error writing to Firestore: {e}")
+# try:
+#     db.collection("test").document("debug").set({"message": "Hello, Firestore!"})
+#     st.success("✅ Firestore write test successful!")
+# except Exception as e:
+#     st.error(f"🚨 Error writing to Firestore: {e}")
 
 
-try:
-    doc = db.collection("test").document("debug").get()
-    if doc.exists:
-        st.success(f"✅ Firestore read test successful: {doc.to_dict()}")
-    else:
-        st.warning("⚠️ Firestore document not found.")
-except Exception as e:
-    st.error(f"🚨 Error reading from Firestore: {e}")
+# try:
+#     doc = db.collection("test").document("debug").get()
+#     if doc.exists:
+#         st.success(f"✅ Firestore read test successful: {doc.to_dict()}")
+#     else:
+#         st.warning("⚠️ Firestore document not found.")
+# except Exception as e:
+#     st.error(f"🚨 Error reading from Firestore: {e}")
 
 
 #----------------------------------------------------------------------------------------
