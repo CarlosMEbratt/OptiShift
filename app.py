@@ -5,22 +5,32 @@ import pandas as pd
 from firebase_admin import credentials, firestore, auth
 import requests
 
-import random, string
+import random, string, os, json
 import time
 import subprocess, sys
 from twilio.rest import Client
 
 
-# Initialize Firebase only if not already initialized
-def initialize_firebase():
-    try:
-        # Check if Firebase has already been initialized
-        if not firebase_admin._apps:
-            cred = credentials.Certificate('serviceAccountKey.json')
-            firebase_admin.initialize_app(cred)
+# # Initialize Firebase only if not already initialized
+# def initialize_firebase():
+#     try:
+#         # Check if Firebase has already been initialized
+#         if not firebase_admin._apps:
+#             cred = credentials.Certificate('serviceAccountKey.json')
+#             firebase_admin.initialize_app(cred)
         
-    except Exception as e:
-        st.write(f"Error initializing Firebase: {e}")
+#     except Exception as e:
+#         st.write(f"Error initializing Firebase: {e}")
+
+# ✅ Load Firebase credentials from environment variable
+firebase_credentials = os.getenv("FIREBASE_CREDENTIALS")
+
+if firebase_credentials:
+    cred_dict = json.loads(firebase_credentials)
+    cred = credentials.Certificate(cred_dict)
+    firebase_admin.initialize_app(cred)
+else:
+    raise ValueError("FIREBASE_CREDENTIALS environment variable not set.")
 
 # Initialize Firebase (only once)
 initialize_firebase()
