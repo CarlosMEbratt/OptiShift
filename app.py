@@ -6,19 +6,37 @@ import random, string, os, json, time, subprocess, sys
 from firebase_admin import credentials, firestore, auth
 from twilio.rest import Client
 
-# ✅ Load Firebase credentials correctly from Streamlit secrets
+# ✅ Debug: Check if secrets are loaded
+if "FIREBASE_CREDENTIALS" not in st.secrets:
+    st.error("🚨 FIREBASE_CREDENTIALS not found in Streamlit secrets.")
+    st.stop()
+
+# ✅ Load Firebase credentials
 firebase_credentials = st.secrets["FIREBASE_CREDENTIALS"]
 
-if firebase_credentials:
+try:
     cred_dict = json.loads(firebase_credentials)  # Convert string to dictionary
-    if not firebase_admin._apps:  # ✅ Initialize Firebase only if not already initialized
+    st.success("✅ Firebase credentials loaded successfully.")
+except json.JSONDecodeError as e:
+    st.error(f"🚨 Error decoding JSON: {e}")
+    st.stop()
+
+# ✅ Initialize Firebase only once
+if not firebase_admin._apps:
+    try:
         cred = credentials.Certificate(cred_dict)
         firebase_admin.initialize_app(cred)
-else:
-    raise ValueError("🔥 FIREBASE_CREDENTIALS not set. Configure it in Streamlit Secrets.")
+        st.success("✅ Firebase initialized successfully.")
+    except Exception as e:
+        st.error(f"🚨 Error initializing Firebase: {e}")
+        st.stop()
 
 # ✅ Initialize Firestore client
-db = firestore.client()
+try:
+    db = firestore.client()
+    st.success("✅ Firestore client initialized.")
+except Exception as e:
+    st.error(f"🚨 Error initializing Firestore client: {e}")
 
 
 # Collection references
