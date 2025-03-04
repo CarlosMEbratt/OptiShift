@@ -6,38 +6,42 @@ import random, string, os, json, time, subprocess, sys
 from firebase_admin import credentials, firestore, auth
 from twilio.rest import Client
 
-# ✅ Debug: Check if secrets are loaded
-if "FIREBASE_CREDENTIALS" not in st.secrets:
-    st.error("🚨 FIREBASE_CREDENTIALS not found in Streamlit secrets.")
-    st.stop()
-
-# ✅ Load Firebase credentials
+# ✅ Load Firebase credentials correctly from Streamlit secrets
 firebase_credentials = st.secrets["FIREBASE_CREDENTIALS"]
 
-try:
+if firebase_credentials:
     cred_dict = json.loads(firebase_credentials)  # Convert string to dictionary
-    st.success("✅ Firebase credentials loaded successfully.")
-except json.JSONDecodeError as e:
-    st.error(f"🚨 Error decoding JSON: {e}")
-    st.stop()
-
-# ✅ Initialize Firebase only once
-if not firebase_admin._apps:
-    try:
+    if not firebase_admin._apps:  # ✅ Initialize Firebase only if not already initialized
         cred = credentials.Certificate(cred_dict)
         firebase_admin.initialize_app(cred)
-        st.success("✅ Firebase initialized successfully.")
-    except Exception as e:
-        st.error(f"🚨 Error initializing Firebase: {e}")
-        st.stop()
+else:
+    raise ValueError("🔥 FIREBASE_CREDENTIALS not set. Configure it in Streamlit Secrets.")
 
 # ✅ Initialize Firestore client
-try:
-    db = firestore.client()
-    st.success("✅ Firestore client initialized.")
-except Exception as e:
-    st.error(f"🚨 Error initializing Firestore client: {e}")
+db = firestore.client()
 
+
+
+#----------------------------------------------------------------------------------------
+
+try:
+    db.collection("test").document("debug").set({"message": "Hello, Firestore!"})
+    st.success("✅ Firestore write test successful!")
+except Exception as e:
+    st.error(f"🚨 Error writing to Firestore: {e}")
+
+
+try:
+    doc = db.collection("test").document("debug").get()
+    if doc.exists:
+        st.success(f"✅ Firestore read test successful: {doc.to_dict()}")
+    else:
+        st.warning("⚠️ Firestore document not found.")
+except Exception as e:
+    st.error(f"🚨 Error reading from Firestore: {e}")
+
+
+#----------------------------------------------------------------------------------------
 
 # Collection references
 employees_ref = db.collection('employees')
