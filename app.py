@@ -639,10 +639,10 @@ def do_assignments():
         with st.spinner("⚡ Running assignment process..."):
             try:
                 employees = [doc.to_dict() for doc in db.collection("employees").stream()]
-
-                # ✅ Filter only job sites where `job_status` is "active"
+                
+                # ✅ Filter only active job sites
                 job_sites = [doc.to_dict() for doc in db.collection("job_sites").stream() if doc.to_dict().get("job_status", "").lower() == "active"]
-
+                
                 assigned_employees = set()
 
                 if not job_sites:
@@ -660,7 +660,7 @@ def do_assignments():
                         entity["latitude"] = lat
                         entity["longitude"] = lon
 
-                # Assignment logic
+                # ✅ Assignment Logic: Strict Role Matching
                 for site in job_sites:
                     required_roles = site.get('required_roles', {})
                     assigned_counts = {role: 0 for role in required_roles}
@@ -672,21 +672,35 @@ def do_assignments():
 
                         employee_scores = []
                         for employee in employees:
-                            score = 0
-                            if role in employee.get('role', []):
-                                score += 5
+                            # ✅ Ensure the employee's role matches the site's required role
+                            employee_roles = employee.get('role', [])
+                            if isinstance(employee_roles, str):  # If stored as a single string
+                                employee_roles = [employee_roles]
+
+                            if role not in employee_roles:
+                                continue  # ❌ Skip this employee if their role doesn't match
+
+                            # ✅ Scoring System (Prioritizing Role Match First)
+                            score = 5  # Base score since role already matches
                             if any(shift in employee.get('availability', []) for shift in role_data.get('work_schedule', [])):
                                 score += 4
                             if employee.get('have_car', 'No') == 'Yes':
                                 score += 3
 
-                            distance = calculate_distance((employee['latitude'], employee['longitude']), (site['latitude'], site['longitude']))
+                            distance = calculate_distance(
+                                (employee['latitude'], employee['longitude']), 
+                                (site['latitude'], site['longitude'])
+                            )
                             if distance <= 40:
                                 score += 2
 
                             employee_scores.append({'employee': employee, 'score': score, 'distance': distance})
 
-                        sorted_employees = sorted(employee_scores, key=lambda x: (-x['score'], x['distance'], -x['employee'].get('rating', 0)))
+                        # ✅ Sort employees by score (higher is better), then by distance (lower is better)
+                        sorted_employees = sorted(
+                            employee_scores, 
+                            key=lambda x: (-x['score'], x['distance'], -x['employee'].get('rating', 0))
+                        )
 
                         assigned = 0
                         for emp_data in sorted_employees:
@@ -717,6 +731,7 @@ def do_assignments():
 
         # ✅ Refresh UI
         view_assignments()
+
 
 
 
