@@ -3,3 +3,5 @@ firebase-admin
 pandas
 requests
 twilio
+googlemaps
+geopy
