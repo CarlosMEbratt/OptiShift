@@ -742,7 +742,7 @@ def do_assignments():
 
 # ✅ Twilio Credentials (Replace these with your actual credentials)
 TWILIO_SID = "ACea4083caabbc067e4b57269ee7e90f8e"
-TWILIO_AUTH_TOKEN = "1a0e3164e8faf75f4286c4bde720c5b3"
+TWILIO_AUTH_TOKEN = "a1d940135ef67caf02be6ff12d78c77c"
 TWILIO_PHONE_NUMBER = "+18573492964"
 
 # ✅ Function to Send SMS
