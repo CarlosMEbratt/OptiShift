@@ -6,6 +6,16 @@ import random, string, os, json, time, subprocess, sys
 from firebase_admin import credentials, firestore, auth
 from twilio.rest import Client
 
+
+import time
+import googlemaps
+import geopy.distance
+import re
+from datetime import datetime
+from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut
+
+
 # ✅ Load Firebase credentials correctly from Streamlit secrets
 firebase_credentials = st.secrets["FIREBASE_CREDENTIALS"]
 
@@ -546,10 +556,85 @@ def view_assignments():
 
 #----------------------------------------------------------------------------------------
 
-import time
-import sys
-import subprocess
 
+# ✅ Step 1: Initialize Firebase
+def initialize_firebase():
+    """Initializes Firebase if not already initialized."""
+    try:
+        if not firebase_admin._apps:
+            cred = credentials.Certificate("serviceAccountKey.json")
+            firebase_admin.initialize_app(cred)
+            print("✅ Firebase successfully initialized.")
+        else:
+            print("✅ Firebase already initialized.")
+        return firestore.client()
+    except Exception as e:
+        print(f"🔥 Firebase initialization failed: {e}")
+        return None
+
+# Initialize Firestore client
+db = initialize_firebase()
+if db is None:
+    print("⚠️ Firestore initialization failed. Exiting.")
+    exit()
+
+assignments_ref = db.collection("assignments")
+
+# ✅ Step 2: Initialize Geocoders
+GOOGLE_API_KEY = "AIzaSyADgR5Y3ARu69ClnxiAJ2XN5XZQ7OaY_0E"
+gmaps = googlemaps.Client(key=GOOGLE_API_KEY)
+geolocator_osm = Nominatim(user_agent="optishift_geocoder")  # OSM as a backup
+
+# ✅ Step 3: Geocoding Functions
+def clean_geocode_address(address):
+    """Cleans an address by removing unnecessary details."""
+    address = re.sub(r'\b(Unit|Suite|Apt|Floor|Rm|#)\s*\d+\b', '', address, flags=re.IGNORECASE)
+    address = re.sub(r'\b(Shopping Center|Mall|Plaza|Building|Complex)\b', '', address, flags=re.IGNORECASE)
+    return address.strip()
+
+def google_geocode(address, max_retries=3):
+    """Geocodes an address using Google Maps API with retry logic."""
+    address = clean_geocode_address(address)
+    for attempt in range(max_retries):
+        try:
+            geocode_result = gmaps.geocode(address)
+            if geocode_result:
+                lat = geocode_result[0]['geometry']['location']['lat']
+                lon = geocode_result[0]['geometry']['location']['lng']
+                return lat, lon
+        except Exception as e:
+            print(f"❌ Google Maps Geocode error for {address}: {e}")
+        time.sleep(2)
+    return None, None
+
+def osm_geocode(address, max_retries=3):
+    """Geocodes an address using OpenStreetMap (OSM) with retry logic."""
+    address = clean_geocode_address(address)
+    for attempt in range(max_retries):
+        try:
+            location = geolocator_osm.geocode(address, timeout=10)
+            if location:
+                return location.latitude, location.longitude
+        except GeocoderTimedOut:
+            print(f"⏳ OSM Timeout error for {address}. Attempt {attempt+1}/{max_retries}")
+        time.sleep(2)
+    return None, None
+
+def geocode_address(address):
+    """Tries Google Maps first, then OSM if it fails."""
+    lat, lon = google_geocode(address)
+    if lat is None or lon is None:
+        lat, lon = osm_geocode(address)
+    return lat, lon
+
+# ✅ Step 4: Distance Calculation
+def calculate_distance(employee_location, site_location):
+    if None in employee_location or None in site_location:
+        print(f"⚠️ Cannot calculate distance. Missing coordinates: {employee_location}, {site_location}")
+        return float('inf')
+    return geopy.distance.distance(employee_location, site_location).km
+
+# ✅ Step 5: Assignment Function
 def do_assignments():
     st.header("🔄 Run Assignments")
     st.write("Click below to run the assignment process and match employees to job sites.")
@@ -562,22 +647,87 @@ def do_assignments():
                 for doc in old_assignments:
                     batch.delete(doc.reference)
                 batch.commit()
-                time.sleep(2)  # Allow Firestore sync
-                #st.success("✅ Old assignments deleted successfully!")
+                time.sleep(2)  # Firestore sync
+                st.success("✅ Old assignments deleted successfully!")
             except Exception as e:
                 st.error(f"❌ Error deleting assignments: {e}")
                 return
 
         with st.spinner("⚡ Running assignment process..."):
-            python_executable = sys.executable  # Ensure it runs in the correct environment
-            process = subprocess.run([python_executable, "assign.py"], capture_output=True, text=True)
+            try:
+                employees = [doc.to_dict() for doc in db.collection("employees").stream()]
+                job_sites = [doc.to_dict() for doc in db.collection("job_sites").stream()]
+                assigned_employees = set()
 
-        with st.spinner("🚀 Updating assignments..."):
-            time.sleep(3)  # Allow data to sync before showing assignments
-            st.success("✅ Assignments have been updated!")
+                # Ensure employees and job sites have coordinates
+                for entity in employees + job_sites:
+                    key = "home_address" if "home_address" in entity else "address"
+                    if "latitude" not in entity or "longitude" not in entity or entity["latitude"] is None or entity["longitude"] is None:
+                        lat, lon = geocode_address(entity.get(key, ""))
+                        if lat is None or lon is None:
+                            print(f"⚠️ Skipping {entity.get('worker_id', entity.get('site_id', 'UNKNOWN'))} due to missing geolocation data.")
+                            continue
+                        entity["latitude"] = lat
+                        entity["longitude"] = lon
 
-        # ✅ Call view_assignments() to refresh UI
+                # Assignment logic
+                for site in job_sites:
+                    required_roles = site.get('required_roles', {})
+                    assigned_counts = {role: 0 for role in required_roles}
+
+                    for role, role_data in required_roles.items():
+                        required_count = role_data.get('num_workers', 0)
+                        if required_count == 0:
+                            continue
+
+                        employee_scores = []
+                        for employee in employees:
+                            score = 0
+                            if role in employee.get('role', []):
+                                score += 5
+                            if any(shift in employee.get('availability', []) for shift in role_data.get('work_schedule', [])):
+                                score += 4
+                            if employee.get('have_car', 'No') == 'Yes':
+                                score += 3
+
+                            distance = calculate_distance((employee['latitude'], employee['longitude']), (site['latitude'], site['longitude']))
+                            if distance <= 40:
+                                score += 2
+
+                            employee_scores.append({'employee': employee, 'score': score, 'distance': distance})
+
+                        sorted_employees = sorted(employee_scores, key=lambda x: (-x['score'], x['distance'], -x['employee'].get('rating', 0)))
+
+                        assigned = 0
+                        for emp_data in sorted_employees:
+                            if assigned >= required_count:
+                                break
+                            employee = emp_data['employee']
+                            if employee['worker_id'] in assigned_employees:
+                                continue
+
+                            try:
+                                db.collection('assignments').add({
+                                    'employee_id': employee['worker_id'],
+                                    'job_site_id': site['site_id'],
+                                    'role': role,
+                                    'distance': emp_data['distance'],
+                                    'assigned_date': datetime.now()
+                                })
+                                assigned_employees.add(employee['worker_id'])
+                                assigned += 1
+                            except Exception as e:
+                                print(f"❌ Firestore Write Failed: {e}")
+
+                st.success("✅ Assignments have been updated!")
+
+            except Exception as e:
+                st.error(f"❌ Error running assignments: {e}")
+                return
+
+        # ✅ Refresh UI
         view_assignments()
+
 
 
 #----------------------------------------------------------------------------------------
