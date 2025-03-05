@@ -1004,6 +1004,7 @@ def update_profile():
 #----------------------------------------------------------------------------------------               
 
 
+
 # ✅ Main View (For Admins & Employees)
 def main_view():
     if not st.session_state.get("authenticated"):
@@ -1016,16 +1017,16 @@ def main_view():
     user_id = st.session_state.get("user_id")  # User document ID in "users" collection
     user_role = st.session_state.get("user_role", "employee")  # Default role: "employee"
 
-    # Initialize selected employee view state
+    # Initialize the selected view state for employees
     if "selected_employee_view" not in st.session_state:
         st.session_state["selected_employee_view"] = "assignments"  # Default to showing assignments
 
-    # Step 1: Fetch Employee's Worker ID (Only if Employee)
+    # Step 1: Fetch the Employee's Worker ID (Only if Employee)
     worker_id = None
     if user_role == "employee" and user_id:
-        employee_doc = employees_ref.document(user_id).get()
+        employee_doc = employees_ref.document(user_id).get()  # Fetch employee document
         if employee_doc.exists:
-            worker_id = employee_doc.to_dict().get("worker_id")
+            worker_id = employee_doc.to_dict().get("worker_id")  # Extract worker_id
 
     # Step 2: Fetch Assignment using Worker ID
     assigned_job = None
@@ -1033,27 +1034,27 @@ def main_view():
         def get_assigned_job(worker_id):
             assigned_jobs = assignments_ref.where("employee_id", "==", worker_id).stream()
             for job in assigned_jobs:
-                return job.to_dict()
-            return None
+                return job.to_dict()  # Return the first found assignment
+            return None  # No job assigned
 
         assigned_job = get_assigned_job(worker_id)
 
-    # 🔹 Employee View Toggle Buttons (Prevents rendering both views at the same time)
+    # 🔹 Employee View Toggle Buttons
     if user_role == "employee":
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🏗 JobSite Assignments", key="btn_assignments"):
+            if st.button("🏗 JobSite Assignments"):
                 st.session_state["selected_employee_view"] = "assignments"
-                st.rerun()
-
+                st.rerun()  # Force re-run to reflect change
+        
         with col2:
-            if st.button("📝 Update Your Information", key="btn_update"):
+            if st.button("📝 Update Your Information"):
                 st.session_state["selected_employee_view"] = "update_profile"
                 st.rerun()
 
         st.write("---")  # Divider
 
-        # 🔹 **Strict Conditional Rendering (Ensures only one view at a time)**
+        # 🔹 **Render Based on Selected Employee View**
         if st.session_state["selected_employee_view"] == "assignments":
             if assigned_job:
                 job_site = job_sites_ref.document(assigned_job['job_site_id']).get()
@@ -1067,9 +1068,9 @@ def main_view():
                 st.write(f"📅 **Assigned On:** {assigned_job['assigned_date'].strftime('%Y-%m-%d %H:%M')}")
             else:
                 st.warning("⚠️ No job site assigned yet.")
-
+        
         elif st.session_state["selected_employee_view"] == "update_profile":
-            update_profile()  # 🔹 Now this function will only be called when selected
+            update_profile()
 
         st.write("---")  # Divider
 
@@ -1126,7 +1127,6 @@ def main_view():
     if st.button("🚪 Logout"):
         st.session_state.clear()
         st.rerun()
-
 
 
 
