@@ -1011,10 +1011,43 @@ def main_view():
     st.title("📊 OptiShift Dashboard")
     st.subheader("Welcome to the workforce management system")
     st.write("Select an option below:")
-    
-    user_role = st.session_state.get("user_role", "employee")
-    
-    if user_role == "admin":
+
+    user_id = st.session_state.get("user_id")  # Get logged-in user's ID
+
+    # Fetch assigned job site details for the employee
+    def get_assigned_job(user_id):
+        assigned_job = assignments_ref.where("employee_id", "==", user_id).stream()
+        for job in assigned_job:
+            return job.to_dict()  # Return the first found assignment
+        return None  # No job assigned
+
+    assigned_job = get_assigned_job(user_id)  # Retrieve assigned job
+
+    # UI for Employee Role
+    if st.session_state.get("user_role") == "employee":
+        if st.button("📝 Update Profile"):
+            st.session_state["selected_section"] = "profile"
+
+    st.write("---")  # First horizontal line
+
+    # 🔹 **Display Job Assignment Details (If Available)**
+    if assigned_job:
+        job_site = job_sites_ref.document(assigned_job['job_site_id']).get()
+        job_site_data = job_site.to_dict() if job_site.exists else {}
+
+        st.success("✅ You have been assigned to a job site!")
+        st.write(f"🏗 **Site Name:** {job_site_data.get('site_name', 'Unknown')}")
+        st.write(f"📍 **Address:** {job_site_data.get('address', 'Unknown')}")
+        st.write(f"👷 **Role:** {assigned_job['role']}")
+        st.write(f"📏 **Distance:** {round(assigned_job.get('distance', 0), 2)} km")
+        st.write(f"📅 **Assigned On:** {assigned_job['assigned_date'].strftime('%Y-%m-%d %H:%M')}")
+    else:
+        st.warning("⚠️ No job site assigned yet.")
+
+    st.write("---")  # Second horizontal line
+
+    # Admin View: Show Employee, Job Site, and Assignment Options
+    if st.session_state.get("user_role") == "admin":
         menu_options = {
             "👥 Employees": "employees",
             "🏗️ Job Sites": "job_sites",
@@ -1023,57 +1056,50 @@ def main_view():
         selected_option = st.radio("Navigation:", list(menu_options.keys()), horizontal=True, index=None)
         if selected_option:
             st.session_state["selected_section"] = menu_options[selected_option]
-    
-    elif user_role == "employee":
-        if st.button("📝 Update Profile"):
-            st.session_state["selected_section"] = "profile"
-    
-    st.write("---")
-    
+
+    # Load relevant section
     if st.session_state.get("selected_section") == "employees":
         st.subheader("👥 Employee Actions")
         menu = ["Add Employee", "View Employees", "Find and Update Employee"]
         choice = st.selectbox("Select an option", menu, index=None, placeholder="Select an action", label_visibility="collapsed")
-        
         if choice == "Add Employee":
             add_employee_form()
         elif choice == "View Employees":
             view_employees()
         elif choice == "Find and Update Employee":
             find_and_update_employee()
-    
+
     elif st.session_state.get("selected_section") == "job_sites":
         st.subheader("🏗️ Job Site Actions")
         menu = ["Add Job Site", "View Job Sites", "Find and Update Job Site"]
         choice = st.selectbox("Select an option", menu, index=None, placeholder="Select an action", label_visibility="collapsed")
-        
         if choice == "Add Job Site":
             add_job_site_form()
         elif choice == "View Job Sites":
             view_job_sites()
         elif choice == "Find and Update Job Site":
             find_and_update_job_site()
-    
+
     elif st.session_state.get("selected_section") == "assignments":
         st.subheader("📋 Assignments Actions")
         menu = ["View Assignments", "Do Assignments", "Notify Employees"]
         choice = st.selectbox("Select an option", menu, index=None, placeholder="Select an action", label_visibility="collapsed")
-        
         if choice == "View Assignments":
             view_assignments()
         elif choice == "Do Assignments":
             do_assignments()
         elif choice == "Notify Employees":
             notify_employees()
-    
+
     elif st.session_state.get("selected_section") == "profile":
         update_profile()
-    
+
     st.write("---")
-    
+
     if st.button("🚪 Logout"):
         st.session_state.clear()
         st.rerun()
+
 
 
 
@@ -1102,7 +1128,7 @@ def authentication_ui():
     if st.session_state.get("authenticated"):
         return  # Hide authentication UI after login
 
-    st.title("Welcome to OptiShift")
+    st.title("Welcome to")
     st.image("optishift_logo.png", use_container_width=True)
     st.subheader("Please log in or register to continue.")
 
