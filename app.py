@@ -1031,7 +1031,7 @@ def main_view():
     if st.session_state["selected_section"] == "employees":
         st.subheader("👥 Employee Actions")
         menu = ["Add Employee", "View Employees", "Find and Update Employee"]
-        choice = st.selectbox(menu, index=None, placeholder="Select an action")
+        choice = st.selectbox("Select an option", menu, index=None, placeholder="Select an action", label_visibility="collapsed")
         
         if choice == "Add Employee":
             add_employee_form()
@@ -1043,7 +1043,7 @@ def main_view():
     elif st.session_state["selected_section"] == "job_sites":
         st.subheader("🏗️ Job Site Actions")
         menu = ["Add Job Site", "View Job Sites", "Find and Update Job Site"]
-        choice = st.selectbox(menu, index=None, placeholder="Select an action")
+        choice = st.selectbox("Select an option", menu, index=None, placeholder="Select an action", label_visibility="collapsed")
         
         if choice == "Add Job Site":
             add_job_site_form()
@@ -1055,7 +1055,7 @@ def main_view():
     elif st.session_state["selected_section"] == "assignments":
         st.subheader("📋 Assignments Actions")
         menu = ["View Assignments", "Do Assignments", "Notify Employees"]
-        choice = st.selectbox(menu, index=None, placeholder="Select an action")
+        choice = st.selectbox("Select an option", menu, index=None, placeholder="Select an action", label_visibility="collapsed")
         
         if choice == "View Assignments":
             view_assignments()
