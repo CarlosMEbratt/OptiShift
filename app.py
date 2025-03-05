@@ -1005,6 +1005,7 @@ def update_profile():
 
 # ✅ Main View (For Admins)
 
+
 def main_view():
     if not st.session_state.get("authenticated"):
         st.image("optishift_logo.png", use_container_width=True)
@@ -1015,6 +1016,11 @@ def main_view():
 
     user_id = st.session_state.get("user_id")  # This is the document ID in "users" collection
     user_role = st.session_state.get("user_role", "employee")  # Default role is "employee"
+
+    # ✅ Ensure `user_id` is not None before using it
+    if not user_id:
+        st.error("⚠️ User ID not found. Please log in again.")
+        return
 
     # Step 1: Fetch the Employee's Worker ID using the User's Document ID
     worker_id = None
@@ -1065,7 +1071,7 @@ def main_view():
             else:
                 st.warning("⚠️ No job site assigned yet.")
         elif st.session_state["selected_employee_view"] == "profile":
-            update_profile(unique_key=f"update_profile_{user_id}")  # ✅ Pass unique key to avoid form duplication error
+            update_profile(unique_key=f"update_profile_{user_id if user_id else 'default'}")  # ✅ Ensures a valid key
 
     # 🔹 **For Admins, Show Navigation Menu**
     elif user_role == "admin":
@@ -1118,6 +1124,7 @@ def main_view():
     if st.button("🚪 Logout"):
         st.session_state.clear()
         st.rerun()
+
 
 
 
