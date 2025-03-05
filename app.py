@@ -1154,13 +1154,18 @@ def main():
     # Sidebar is always present but remains hidden
     with st.sidebar:
         st.image("optishift_logo.png", use_container_width=True)
-        st.write("### 🚀 OptiShift: Smart Workforce Management")
-        st.write("Effortlessly assign employees to job sites using an optimized scoring system:")
+        st.write("#### 🚀 OptiShift: Smart Workforce Management System")
+        st.write("**OptiShift** ensures smart workforce assignments by prioritizing:")
+        st.write("- **Best-fit employees** based on role, availability, and location")
+        st.write("- **Scoring system** that ranks workers by skills, distance & transport")
+        st.write("- **Automated job assignments** for efficiency and fairness")
 
-        st.write("- 🏆 **Role Match:** +5 pts if the employee’s role fits the job.")
-        st.write("- ⏳ **Availability Match:** +4 pts if schedules align.")
-        st.write("- 🚗 **Owns a Car:** +3 pts for easier commute.")
-        st.write("- 📍 **Close to Job Site:** +2 pts if within 40 km.")
+        st.write("Read about how the optimized scoring systemworks:")
+
+        st.write(" 🏆 **Role Match:** +5 pts if the employee’s role fits the job.")
+        st.write(" ⏳ **Availability Match:** +4 pts if schedules align.")
+        st.write(" 🚗 **Owns a Car:** +3 pts for easier commute.")
+        st.write(" 📍 **Close to Job Site:** +2 pts if within 40 km.")
 
         st.write("🔹 Employees with the **highest score** are assigned first, ensuring fairness & efficiency.")
         st.write("📊 **Automated, dynamic assignments** keep your workforce optimized in real-time!")
