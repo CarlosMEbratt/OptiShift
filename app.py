@@ -1204,6 +1204,8 @@ def main():
         st.write("- **Scoring system** that ranks workers by skills, distance & transport")
         st.write("- **Automated job assignments** for efficiency and fairness")
 
+        st.write("If you're an 👷🏻‍♀ **employee**, register today to be among the first to get assigned to job sites across the GTA as a Labourer, Cleaner, or Painter!")        
+
         st.write("#### Read about how the optimized scoring systemworks:")
 
         st.write("- 🏆 **Role Match:** +5 pts if the employee’s role fits the job.")
