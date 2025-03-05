@@ -899,7 +899,12 @@ def update_profile():
             middle_name = st.text_input("Middle Name", employee.get("middle_name", "").strip())
             sur_name = st.text_input("Surname", employee.get("sur_name", "").strip())
             phone_number = st.text_input("Phone Number", employee.get("phone_number", "").strip())
-            home_address = st.text_input("Home Address", employee.get("home_address", "").strip())
+            
+            home_address = st.text_input(
+            "Home Address. Use Google Maps to copy paste the exact address.",
+            value=employee.get("home_address", "").strip() or "1110 Atwater Ave, Mississauga, ON L5E 1M9"
+            )
+
             have_car = st.selectbox("Do you have a car?", ["Yes", "No"], index=["Yes", "No"].index(employee.get("have_car", "No")))
             role = st.multiselect("Role", ["Cleaner", "Labour", "Painter"], default=employee.get("role", []))
             availability = st.multiselect("Availability", ["7:00-15:30", "14:00-22:00", "22:00-06:00"], default=employee.get("availability", []))
