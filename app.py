@@ -1003,6 +1003,8 @@ def update_profile():
 
 #----------------------------------------------------------------------------------------               
 
+
+
 # ✅ Main View (For Admins & Employees)
 def main_view():
     if not st.session_state.get("authenticated"):
@@ -1012,43 +1014,49 @@ def main_view():
     st.subheader("Welcome to the workforce management system")
     st.write("Select an option below:")
 
-    # Ensure session state variables are initialized
     user_id = st.session_state.get("user_id")  # User document ID in "users" collection
     user_role = st.session_state.get("user_role", "employee")  # Default role: "employee"
 
-    # Step 1: Fetch Employee's Worker ID (Only if Employee)
+    # Initialize the selected view state for employees
+    if "selected_employee_view" not in st.session_state:
+        st.session_state["selected_employee_view"] = "assignments"  # Default to showing assignments
+
+    # Step 1: Fetch the Employee's Worker ID (Only if Employee)
     worker_id = None
     if user_role == "employee" and user_id:
-        try:
-            employee_doc = employees_ref.document(user_id).get()  # Fetch employee document
-            if employee_doc.exists:
-                worker_id = employee_doc.to_dict().get("worker_id")  # Extract worker_id
-        except Exception as e:
-            st.error(f"Error fetching employee details: {e}")
+        employee_doc = employees_ref.document(user_id).get()  # Fetch employee document
+        if employee_doc.exists:
+            worker_id = employee_doc.to_dict().get("worker_id")  # Extract worker_id
 
     # Step 2: Fetch Assignment using Worker ID
     assigned_job = None
     if worker_id:
         def get_assigned_job(worker_id):
-            try:
-                assigned_jobs = assignments_ref.where("employee_id", "==", worker_id).stream()
-                for job in assigned_jobs:
-                    return job.to_dict()  # Return the first found assignment
-                return None  # No job assigned
-            except Exception as e:
-                st.error(f"Error fetching job assignment: {e}")
-                return None
+            assigned_jobs = assignments_ref.where("employee_id", "==", worker_id).stream()
+            for job in assigned_jobs:
+                return job.to_dict()  # Return the first found assignment
+            return None  # No job assigned
 
         assigned_job = get_assigned_job(worker_id)
 
-        if st.button("📝 Update your Information"):
-            st.session_state["selected_section"] = "profile"
+    # 🔹 Employee View Toggle Buttons
+    if user_role == "employee":
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🏗 JobSite Assignments"):
+                st.session_state["selected_employee_view"] = "assignments"
+                st.rerun()  # Force re-run to reflect change
+        
+        with col2:
+            if st.button("📝 Update Your Information"):
+                st.session_state["selected_employee_view"] = "update_profile"
+                st.rerun()
 
         st.write("---")  # Divider
 
-        # 🔹 **Display Job Assignment Details for Employees**
-        if assigned_job:
-            try:
+        # 🔹 **Render Based on Selected Employee View**
+        if st.session_state["selected_employee_view"] == "assignments":
+            if assigned_job:
                 job_site = job_sites_ref.document(assigned_job['job_site_id']).get()
                 job_site_data = job_site.to_dict() if job_site.exists else {}
 
@@ -1058,37 +1066,30 @@ def main_view():
                 st.write(f"👷 **Role:** {assigned_job['role']}")
                 st.write(f"📏 **Distance:** {round(assigned_job.get('distance', 0), 2)} km")
                 st.write(f"📅 **Assigned On:** {assigned_job['assigned_date'].strftime('%Y-%m-%d %H:%M')}")
-            except Exception as e:
-                st.error(f"Error retrieving job site details: {e}")
-        else:
-            st.warning("⚠️ No job site assigned yet.")
+            else:
+                st.warning("⚠️ No job site assigned yet.")
+        
+        elif st.session_state["selected_employee_view"] == "update_profile":
+            update_profile()
 
         st.write("---")  # Divider
 
-    # 🔹 **For Admins, Avoid Blank Rows**
+    # 🔹 **For Admins, Show Navigation Instead**
     elif user_role == "admin":
-        st.write("")  # Prevents empty UI space
-
-    # 🛠️ **Admin View (Manage Employees, Job Sites, Assignments)**
-    if user_role == "admin":
         menu_options = {
             "👥 Employees": "employees",
             "🏗️ Job Sites": "job_sites",
             "📋 Assignments": "assignments"
         }
-        
-        # ✅ Prevent empty selection issues by setting default index
-        selected_option = st.radio("Navigation:", list(menu_options.keys()), horizontal=True, index=0)
+        selected_option = st.radio("Navigation:", list(menu_options.keys()), horizontal=True, index=None)
         if selected_option:
             st.session_state["selected_section"] = menu_options[selected_option]
 
     # Load relevant section
-    selected_section = st.session_state.get("selected_section", "")
-
-    if selected_section == "employees":
+    if st.session_state.get("selected_section") == "employees":
         st.subheader("👥 Employee Actions")
         menu = ["Add Employee", "View Employees", "Find and Update Employee"]
-        choice = st.selectbox("Select an option", menu, index=0, label_visibility="collapsed")
+        choice = st.selectbox("Select an option", menu, index=None, placeholder="Select an action", label_visibility="collapsed")
         if choice == "Add Employee":
             add_employee_form()
         elif choice == "View Employees":
@@ -1096,10 +1097,10 @@ def main_view():
         elif choice == "Find and Update Employee":
             find_and_update_employee()
 
-    elif selected_section == "job_sites":
+    elif st.session_state.get("selected_section") == "job_sites":
         st.subheader("🏗️ Job Site Actions")
         menu = ["Add Job Site", "View Job Sites", "Find and Update Job Site"]
-        choice = st.selectbox("Select an option", menu, index=0, label_visibility="collapsed")
+        choice = st.selectbox("Select an option", menu, index=None, placeholder="Select an action", label_visibility="collapsed")
         if choice == "Add Job Site":
             add_job_site_form()
         elif choice == "View Job Sites":
@@ -1107,10 +1108,10 @@ def main_view():
         elif choice == "Find and Update Job Site":
             find_and_update_job_site()
 
-    elif selected_section == "assignments":
+    elif st.session_state.get("selected_section") == "assignments":
         st.subheader("📋 Assignments Actions")
         menu = ["View Assignments", "Do Assignments", "Notify Employees"]
-        choice = st.selectbox("Select an option", menu, index=0, label_visibility="collapsed")
+        choice = st.selectbox("Select an option", menu, index=None, placeholder="Select an action", label_visibility="collapsed")
         if choice == "View Assignments":
             view_assignments()
         elif choice == "Do Assignments":
@@ -1118,7 +1119,7 @@ def main_view():
         elif choice == "Notify Employees":
             notify_employees()
 
-    elif selected_section == "profile":
+    elif st.session_state.get("selected_section") == "profile":
         update_profile()
 
     st.write("---")
@@ -1126,8 +1127,6 @@ def main_view():
     if st.button("🚪 Logout"):
         st.session_state.clear()
         st.rerun()
-
-
 
 
 
