@@ -1019,19 +1019,21 @@ def main_view():
             "🏗️ Job Sites": "job_sites",
             "📋 Assignments": "assignments"
         }
-    else:
-        menu_options = {"📝 Update Profile": "profile"}
+        selected_option = st.radio("Navigation:", ["Select an option"] + list(menu_options.keys()), horizontal=True, index=0)
+        if selected_option == "Select an option":
+            return  # Do not display any content until the user selects an option
+        st.session_state["selected_section"] = menu_options[selected_option]
     
-    selected_option = st.radio("Navigation:", list(menu_options.keys()), horizontal=True)
-    
-    st.session_state["selected_section"] = menu_options[selected_option]
+    elif user_role == "employee":
+        if st.button("📝 Update Profile"):
+            st.session_state["selected_section"] = "profile"
     
     st.write("---")
     
-    if st.session_state["selected_section"] == "employees":
+    if st.session_state.get("selected_section") == "employees":
         st.subheader("👥 Employee Actions")
-        menu = ["Add Employee", "View Employees", "Find and Update Employee"]
-        choice = st.selectbox("Select an option", menu, index=None, placeholder="Select an action", label_visibility="collapsed")
+        menu = ["Select an action", "Add Employee", "View Employees", "Find and Update Employee"]
+        choice = st.selectbox("Select an option", menu, index=0, label_visibility="collapsed")
         
         if choice == "Add Employee":
             add_employee_form()
@@ -1040,10 +1042,10 @@ def main_view():
         elif choice == "Find and Update Employee":
             find_and_update_employee()
     
-    elif st.session_state["selected_section"] == "job_sites":
+    elif st.session_state.get("selected_section") == "job_sites":
         st.subheader("🏗️ Job Site Actions")
-        menu = ["Add Job Site", "View Job Sites", "Find and Update Job Site"]
-        choice = st.selectbox("Select an option", menu, index=None, placeholder="Select an action", label_visibility="collapsed")
+        menu = ["Select an action", "Add Job Site", "View Job Sites", "Find and Update Job Site"]
+        choice = st.selectbox("Select an option", menu, index=0, label_visibility="collapsed")
         
         if choice == "Add Job Site":
             add_job_site_form()
@@ -1052,10 +1054,10 @@ def main_view():
         elif choice == "Find and Update Job Site":
             find_and_update_job_site()
     
-    elif st.session_state["selected_section"] == "assignments":
+    elif st.session_state.get("selected_section") == "assignments":
         st.subheader("📋 Assignments Actions")
-        menu = ["View Assignments", "Do Assignments", "Notify Employees"]
-        choice = st.selectbox("Select an option", menu, index=None, placeholder="Select an action", label_visibility="collapsed")
+        menu = ["Select an action", "View Assignments", "Do Assignments", "Notify Employees"]
+        choice = st.selectbox("Select an option", menu, index=0, label_visibility="collapsed")
         
         if choice == "View Assignments":
             view_assignments()
@@ -1064,7 +1066,7 @@ def main_view():
         elif choice == "Notify Employees":
             notify_employees()
     
-    elif st.session_state["selected_section"] == "profile":
+    elif st.session_state.get("selected_section") == "profile":
         st.subheader("📝 Update Your Profile")
         update_profile()
     
