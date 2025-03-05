@@ -1007,47 +1007,50 @@ def update_profile():
 def main_view():
     if not st.session_state.get("authenticated"):
         st.image("optishift_logo.png", use_container_width=True)
-    
+
     st.title("📊 OptiShift Dashboard")
     st.subheader("Welcome to the workforce management system")
     st.write("Select an option below:")
 
     user_id = st.session_state.get("user_id")  # Get logged-in user's ID
+    user_role = st.session_state.get("user_role", "employee")  # Default role is "employee"
 
-    # Fetch assigned job site details for the employee
-    def get_assigned_job(user_id):
-        assigned_job = assignments_ref.where("employee_id", "==", user_id).stream()
-        for job in assigned_job:
-            return job.to_dict()  # Return the first found assignment
-        return None  # No job assigned
+    # Only fetch assignment details for employees
+    if user_role == "employee":
+        def get_assigned_job(user_id):
+            assigned_job = assignments_ref.where("employee_id", "==", user_id).stream()
+            for job in assigned_job:
+                return job.to_dict()  # Return the first found assignment
+            return None  # No job assigned
 
-    assigned_job = get_assigned_job(user_id)  # Retrieve assigned job
+        assigned_job = get_assigned_job(user_id)  # Retrieve assigned job
 
     # UI for Employee Role
-    if st.session_state.get("user_role") == "employee":
+    if user_role == "employee":
         if st.button("📝 Update Profile"):
             st.session_state["selected_section"] = "profile"
 
     st.write("---")  # First horizontal line
 
-    # 🔹 **Display Job Assignment Details (If Available)**
-    if assigned_job:
-        job_site = job_sites_ref.document(assigned_job['job_site_id']).get()
-        job_site_data = job_site.to_dict() if job_site.exists else {}
+    # 🔹 **Display Job Assignment Details ONLY for Employees**
+    if user_role == "employee":
+        if assigned_job:
+            job_site = job_sites_ref.document(assigned_job['job_site_id']).get()
+            job_site_data = job_site.to_dict() if job_site.exists else {}
 
-        st.success("✅ You have been assigned to a job site!")
-        st.write(f"🏗 **Site Name:** {job_site_data.get('site_name', 'Unknown')}")
-        st.write(f"📍 **Address:** {job_site_data.get('address', 'Unknown')}")
-        st.write(f"👷 **Role:** {assigned_job['role']}")
-        st.write(f"📏 **Distance:** {round(assigned_job.get('distance', 0), 2)} km")
-        st.write(f"📅 **Assigned On:** {assigned_job['assigned_date'].strftime('%Y-%m-%d %H:%M')}")
-    else:
-        st.warning("⚠️ No job site assigned yet.")
+            st.success("✅ You have been assigned to a job site!")
+            st.write(f"🏗 **Site Name:** {job_site_data.get('site_name', 'Unknown')}")
+            st.write(f"📍 **Address:** {job_site_data.get('address', 'Unknown')}")
+            st.write(f"👷 **Role:** {assigned_job['role']}")
+            st.write(f"📏 **Distance:** {round(assigned_job.get('distance', 0), 2)} km")
+            st.write(f"📅 **Assigned On:** {assigned_job['assigned_date'].strftime('%Y-%m-%d %H:%M')}")
+        else:
+            st.warning("⚠️ No job site assigned yet.")
 
     st.write("---")  # Second horizontal line
 
     # Admin View: Show Employee, Job Site, and Assignment Options
-    if st.session_state.get("user_role") == "admin":
+    if user_role == "admin":
         menu_options = {
             "👥 Employees": "employees",
             "🏗️ Job Sites": "job_sites",
@@ -1099,6 +1102,7 @@ def main_view():
     if st.button("🚪 Logout"):
         st.session_state.clear()
         st.rerun()
+
 
 
 
