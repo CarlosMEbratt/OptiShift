@@ -1003,6 +1003,7 @@ def update_profile():
 
 #----------------------------------------------------------------------------------------               
 
+# ✅ Main View (For Admins)
 def main_view():
     if not st.session_state.get("authenticated"):
         st.image("optishift_logo.png", use_container_width=True)
@@ -1021,10 +1022,7 @@ def main_view():
     else:
         menu_options = {"📝 Update Profile": "profile"}
     
-    selected_option = st.radio("Navigation:", ["Select an option"] + list(menu_options.keys()), horizontal=True, index=0)
-    
-    if selected_option == "Select an option":
-        return  # Do not display any content until the user selects an option
+    selected_option = st.radio("Navigation:", list(menu_options.keys()), horizontal=True)
     
     st.session_state["selected_section"] = menu_options[selected_option]
     
@@ -1032,8 +1030,8 @@ def main_view():
     
     if st.session_state["selected_section"] == "employees":
         st.subheader("👥 Employee Actions")
-        menu = ["Select an action", "Add Employee", "View Employees", "Find and Update Employee"]
-        choice = st.selectbox("Choose an action:", menu, index=0)
+        menu = ["Add Employee", "View Employees", "Find and Update Employee"]
+        choice = st.selectbox(menu, index=None, placeholder="Select an action")
         
         if choice == "Add Employee":
             add_employee_form()
@@ -1044,8 +1042,8 @@ def main_view():
     
     elif st.session_state["selected_section"] == "job_sites":
         st.subheader("🏗️ Job Site Actions")
-        menu = ["Select an action", "Add Job Site", "View Job Sites", "Find and Update Job Site"]
-        choice = st.selectbox("Choose an action:", menu, index=0)
+        menu = ["Add Job Site", "View Job Sites", "Find and Update Job Site"]
+        choice = st.selectbox(menu, index=None, placeholder="Select an action")
         
         if choice == "Add Job Site":
             add_job_site_form()
@@ -1056,8 +1054,8 @@ def main_view():
     
     elif st.session_state["selected_section"] == "assignments":
         st.subheader("📋 Assignments Actions")
-        menu = ["Select an action", "View Assignments", "Do Assignments", "Notify Employees"]
-        choice = st.selectbox("Choose an action:", menu, index=0)
+        menu = ["View Assignments", "Do Assignments", "Notify Employees"]
+        choice = st.selectbox(menu, index=None, placeholder="Select an action")
         
         if choice == "View Assignments":
             view_assignments()
