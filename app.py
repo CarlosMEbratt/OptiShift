@@ -1005,8 +1005,6 @@ def update_profile():
 
 # ✅ Main View (For Admins)
 def main_view():
-    
-    
     if not st.session_state.get("authenticated"):
         st.image("optishift_logo.png", use_container_width=True)
     
@@ -1022,10 +1020,9 @@ def main_view():
             "🏗️ Job Sites": "job_sites",
             "📋 Assignments": "assignments"
         }
-        selected_option = st.radio("Navigation:", ["Select an option"] + list(menu_options.keys()), horizontal=True, index=0)
-        if selected_option == "Select an option":
-            return  # Do not display any content until the user selects an option
-        st.session_state["selected_section"] = menu_options[selected_option]
+        selected_option = st.radio("Navigation:", list(menu_options.keys()), horizontal=True, index=None)
+        if selected_option:
+            st.session_state["selected_section"] = menu_options[selected_option]
     
     elif user_role == "employee":
         col1, col2 = st.columns([1, 1])
@@ -1041,8 +1038,8 @@ def main_view():
     
     if st.session_state.get("selected_section") == "employees":
         st.subheader("👥 Employee Actions")
-        menu = ["Select an action", "Add Employee", "View Employees", "Find and Update Employee"]
-        choice = st.selectbox("Select an option", menu, index=0, label_visibility="collapsed")
+        menu = ["Add Employee", "View Employees", "Find and Update Employee"]
+        choice = st.selectbox("Select an option", menu, index=None, placeholder="Select an action", label_visibility="collapsed")
         
         if choice == "Add Employee":
             add_employee_form()
@@ -1053,8 +1050,8 @@ def main_view():
     
     elif st.session_state.get("selected_section") == "job_sites":
         st.subheader("🏗️ Job Site Actions")
-        menu = ["Select an action", "Add Job Site", "View Job Sites", "Find and Update Job Site"]
-        choice = st.selectbox("Select an option", menu, index=0, label_visibility="collapsed")
+        menu = ["Add Job Site", "View Job Sites", "Find and Update Job Site"]
+        choice = st.selectbox("Select an option", menu, index=None, placeholder="Select an action", label_visibility="collapsed")
         
         if choice == "Add Job Site":
             add_job_site_form()
@@ -1065,8 +1062,8 @@ def main_view():
     
     elif st.session_state.get("selected_section") == "assignments":
         st.subheader("📋 Assignments Actions")
-        menu = ["Select an action", "View Assignments", "Do Assignments", "Notify Employees"]
-        choice = st.selectbox("Select an option", menu, index=0, label_visibility="collapsed")
+        menu = ["View Assignments", "Do Assignments", "Notify Employees"]
+        choice = st.selectbox("Select an option", menu, index=None, placeholder="Select an action", label_visibility="collapsed")
         
         if choice == "View Assignments":
             view_assignments()
@@ -1160,7 +1157,7 @@ def main():
         st.write("- Manage employees and their assignments")
         st.write("- Organize job sites and workforce distribution")
         st.write("- View, update, and assign jobs dynamically")
-        
+
     authentication_ui()
     
     if not st.session_state.get("authenticated"):
