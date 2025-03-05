@@ -901,7 +901,7 @@ def update_profile():
             phone_number = st.text_input("Phone Number", employee.get("phone_number", "").strip())
             
             home_address = st.text_input(
-            "Home Address. Use Google Maps to copy paste the exact address.",
+            "Home Address. 📍 Use Google Maps to copy paste the exact address. Example: 👇🏻",
             value=employee.get("home_address", "").strip() or "1110 Atwater Ave, Mississauga, ON L5E 1M9"
             )
 
