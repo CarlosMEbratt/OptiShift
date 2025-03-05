@@ -31,26 +31,6 @@ else:
 db = firestore.client()
 
 
-
-#----------------------------------------------------------------------------------------
-
-# try:
-#     db.collection("test").document("debug").set({"message": "Hello, Firestore!"})
-#     st.success("✅ Firestore write test successful!")
-# except Exception as e:
-#     st.error(f"🚨 Error writing to Firestore: {e}")
-
-
-# try:
-#     doc = db.collection("test").document("debug").get()
-#     if doc.exists:
-#         st.success(f"✅ Firestore read test successful: {doc.to_dict()}")
-#     else:
-#         st.warning("⚠️ Firestore document not found.")
-# except Exception as e:
-#     st.error(f"🚨 Error reading from Firestore: {e}")
-
-
 #----------------------------------------------------------------------------------------
 
 # Collection references
@@ -656,8 +636,15 @@ def do_assignments():
         with st.spinner("⚡ Running assignment process..."):
             try:
                 employees = [doc.to_dict() for doc in db.collection("employees").stream()]
-                job_sites = [doc.to_dict() for doc in db.collection("job_sites").stream()]
+                
+                # ✅ Filter only active job sites
+                job_sites = [doc.to_dict() for doc in db.collection("job_sites").stream() if doc.to_dict().get("is_active", False)]
+                
                 assigned_employees = set()
+
+                if not job_sites:
+                    st.warning("⚠️ No active job sites found.")
+                    return
 
                 # Ensure employees and job sites have coordinates
                 for entity in employees + job_sites:
@@ -727,6 +714,7 @@ def do_assignments():
 
         # ✅ Refresh UI
         view_assignments()
+
 
 
 
