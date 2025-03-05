@@ -1069,12 +1069,7 @@ def main_view():
                 st.warning("⚠️ No job site assigned yet.")
 
         elif st.session_state["selected_employee_view"] == "update_profile":
-            # 🔹 Ensure only one form instance exists
-            if "update_profile_rendered" not in st.session_state:
-                st.session_state["update_profile_rendered"] = True  # Prevents duplicate rendering
-                update_profile()
-            else:
-                st.warning("⚠️ Update Profile is already being displayed.")
+            update_profile()  # 🔹 Now this function will only be called when selected
 
         st.write("---")  # Divider
 
