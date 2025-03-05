@@ -871,34 +871,6 @@ def login_user(email, password):
 #----------------------------------------------------------------------------------------
 
 
-def sidebar_menu():
-    st.sidebar.header("📋 Navigation")
-    st.sidebar.image("optishift_logo.png", use_container_width=True)
-    
-    user_role = st.session_state.get("user_role", "employee")
-    
-    if user_role == "admin":
-        menu_options = {
-            "👥 Employees": "employees",
-            "🏗️ Job Sites": "job_sites",
-            "📋 Assignments": "assignments"
-        }
-        selected_option = st.sidebar.radio("Select an option:", list(menu_options.keys()))
-        if selected_option:
-            st.session_state["selected_section"] = menu_options[selected_option]
-    else:
-        if st.sidebar.button("📝 Update Profile"):
-            st.session_state["selected_section"] = "profile"
-    
-    st.sidebar.write("---")
-    if st.sidebar.button("🚪 Logout"):
-        st.session_state.clear()
-        st.rerun()
-
-
-#----------------------------------------------------------------------------------------
-
-
 # ✅ Profile Update (For Employees) with Certificate Dates
 def update_profile():
     st.subheader("📝 Update Your Profile")
@@ -1000,7 +972,35 @@ def update_profile():
             except Exception as e:
                 st.error(f"❌ Error updating profile: {str(e)}")
 
-              
+
+#----------------------------------------------------------------------------------------
+
+
+def sidebar_menu():
+    st.sidebar.header("📋 Navigation")
+    st.sidebar.image("optishift_logo.png", use_container_width=True)
+    
+    user_role = st.session_state.get("user_role", "employee")
+    
+    if user_role == "admin":
+        menu_options = {
+            "👥 Employees": "employees",
+            "🏗️ Job Sites": "job_sites",
+            "📋 Assignments": "assignments"
+        }
+        selected_option = st.sidebar.radio("Select an option:", list(menu_options.keys()))
+        if selected_option:
+            st.session_state["selected_section"] = menu_options[selected_option]
+    else:
+        if st.sidebar.button("📝 Update Profile"):
+            st.session_state["selected_section"] = "profile"
+    
+    st.sidebar.write("---")
+    if st.sidebar.button("🚪 Logout"):
+        st.session_state.clear()
+        st.rerun()
+        
+                     
 #----------------------------------------------------------------------------------------               
 
 # ✅ Main View (For Admins)
