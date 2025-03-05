@@ -976,9 +976,38 @@ def update_profile():
 #----------------------------------------------------------------------------------------
 
 
-def sidebar_menu():
-    st.sidebar.header("📋 Navigation")
-    st.sidebar.image("optishift_logo.png", use_container_width=True)
+# def sidebar_menu():
+#     st.sidebar.header("📋 Navigation")
+#     st.sidebar.image("optishift_logo.png", use_container_width=True)
+    
+#     user_role = st.session_state.get("user_role", "employee")
+    
+#     if user_role == "admin":
+#         menu_options = {
+#             "👥 Employees": "employees",
+#             "🏗️ Job Sites": "job_sites",
+#             "📋 Assignments": "assignments"
+#         }
+#         selected_option = st.sidebar.radio("Select an option:", list(menu_options.keys()))
+#         if selected_option:
+#             st.session_state["selected_section"] = menu_options[selected_option]
+#     else:
+#         if st.sidebar.button("📝 Update Profile"):
+#             st.session_state["selected_section"] = "profile"
+    
+#     st.sidebar.write("---")
+#     if st.sidebar.button("🚪 Logout"):
+#         st.session_state.clear()
+#         st.rerun()
+
+
+#----------------------------------------------------------------------------------------               
+
+# ✅ Main View (For Admins)
+def main_view():
+    st.title("📊 OptiShift Dashboard")
+    st.image("optishift_logo.png", use_container_width=True)
+    st.write("Welcome to the workforce management system. Select an option below:")
     
     user_role = st.session_state.get("user_role", "employee")
     
@@ -988,60 +1017,59 @@ def sidebar_menu():
             "🏗️ Job Sites": "job_sites",
             "📋 Assignments": "assignments"
         }
-        selected_option = st.sidebar.radio("Select an option:", list(menu_options.keys()))
-        if selected_option:
-            st.session_state["selected_section"] = menu_options[selected_option]
     else:
-        if st.sidebar.button("📝 Update Profile"):
-            st.session_state["selected_section"] = "profile"
+        menu_options = {"📝 Update Profile": "profile"}
     
-    st.sidebar.write("---")
-    if st.sidebar.button("🚪 Logout"):
-        st.session_state.clear()
-        st.rerun()
-        
-                     
-#----------------------------------------------------------------------------------------               
-
-# ✅ Main View (For Admins)
-def main_view():
-    st.header("📊 Admin Dashboard")
-
+    selected_option = st.radio("Navigation:", list(menu_options.keys()), horizontal=True)
+    
+    st.session_state["selected_section"] = menu_options[selected_option]
+    
+    st.write("---")
+    
     if st.session_state["selected_section"] == "employees":
         st.subheader("👥 Employee Actions")
         menu = ["Add Employee", "View Employees", "Find and Update Employee"]
-        choice = st.selectbox("Choose an action:", menu, index=None)
-
+        choice = st.selectbox("Choose an action:", menu)
+        
         if choice == "Add Employee":
             add_employee_form()
         elif choice == "View Employees":
             view_employees()
         elif choice == "Find and Update Employee":
             find_and_update_employee()
-
+    
     elif st.session_state["selected_section"] == "job_sites":
         st.subheader("🏗️ Job Site Actions")
         menu = ["Add Job Site", "View Job Sites", "Find and Update Job Site"]
-        choice = st.selectbox("Choose an action:", menu, index=None)
-
+        choice = st.selectbox("Choose an action:", menu)
+        
         if choice == "Add Job Site":
             add_job_site_form()
         elif choice == "View Job Sites":
             view_job_sites()
         elif choice == "Find and Update Job Site":
             find_and_update_job_site()
-
+    
     elif st.session_state["selected_section"] == "assignments":
         st.subheader("📋 Assignments Actions")
         menu = ["View Assignments", "Do Assignments", "Notify Employees"]
-        choice = st.selectbox("Choose an action:", menu, index=None)
-
+        choice = st.selectbox("Choose an action:", menu)
+        
         if choice == "View Assignments":
             view_assignments()
         elif choice == "Do Assignments":
             do_assignments()
         elif choice == "Notify Employees":
             notify_employees()
+    
+    elif st.session_state["selected_section"] == "profile":
+        st.subheader("📝 Update Your Profile")
+        update_profile()
+    
+    st.write("---")
+    if st.button("🚪 Logout"):
+        st.session_state.clear()
+        st.rerun()
 
 # ✅ Ensure session state is initialized
 if "authenticated" not in st.session_state:
@@ -1066,33 +1094,29 @@ def authentication_ui():
     if st.session_state.get("authenticated"):
         return  # Hide authentication UI after login
 
-    # ✅ Display OptiShift logo at the top, always visible
-    st.title("Welcome to")
+    st.title("Welcome to OptiShift")
     st.image("optishift_logo.png", use_container_width=True)
     st.subheader("Please log in or register to continue.")
 
-    st.sidebar.header("🔑 Authentication")
+    col1, col2 = st.columns(2)
 
-    col1, col2 = st.sidebar.columns(2)
-
-    # ✅ Handle button clicks to show the selected form
     if col1.button("🔐 Login"):
         st.session_state["auth_page"] = "login"
-        st.session_state["login_error"] = None  # ✅ Reset error on page switch
+        st.session_state["login_error"] = None
     if col2.button("📝 Register"):
         st.session_state["auth_page"] = "register"
-        st.session_state["login_error"] = None  # ✅ Reset error on page switch
+        st.session_state["login_error"] = None
 
-    # ✅ Show login or register form dynamically
+    st.write("---")
+
     if st.session_state.get("auth_page") == "login":
         st.subheader("🔐 Login to Your Account")
         email = st.text_input("Enter Email Address")
         password = st.text_input("Enter Password", type="password")
 
         if st.button("Login"):
-            login_user(email, password)  # ✅ Perform login
+            login_user(email, password)
 
-        # ✅ Display persistent error message if login fails
         if st.session_state.get("login_error"):
             st.error(st.session_state["login_error"])
 
@@ -1104,10 +1128,10 @@ def authentication_ui():
 
         if st.button("Register"):
             if password == confirm_password:
-                register_user(email, password)  # ✅ Perform registration
-                st.session_state["show_logo_after_auth"] = True  # ✅ Show logo after registration
-                st.session_state["login_error"] = None  # ✅ Reset error on successful registration
-                st.rerun()  # ✅ Refresh UI
+                register_user(email, password)
+                st.session_state["show_logo_after_auth"] = True
+                st.session_state["login_error"] = None
+                st.rerun()
             else:
                 st.warning("⚠️ Passwords do not match. Please try again.")
 
@@ -1121,32 +1145,11 @@ def authentication_ui():
 # ✅ Main UI with OptiShift Logo for Employees Until Profile Update
 def main():
     authentication_ui()
-
-    if not st.session_state.get("authenticated"):       
-        return  # Stop execution if not authenticated
-
-    if "selected_section" not in st.session_state:
-        st.session_state["selected_section"] = None
-
-    if st.session_state.get("show_logo_after_auth", False) and not st.session_state.get("profile_updated", False):
-        if st.session_state["user_role"] == "employee":
-            st.image("optishift_logo.png", use_container_width=True)
-            st.title("Welcome to OptiShift!")
-            st.subheader("Your account has been successfully created! Please update your profile.")
-            if st.button("Update Profile Now"):
-                st.session_state["selected_section"] = "profile"
-                st.session_state["show_logo_after_auth"] = False  # Ensure the logo screen doesn't show again
-                st.rerun()
-    else:
-        sidebar_menu()
-
-        if st.session_state.get("selected_section") == "profile":
-            st.write("### Profile Update")  # Ensures content is loaded
-            update_profile()
-        elif st.session_state["user_role"] == "admin":
-            main_view()
-        else:
-            st.write("Welcome! Please select an option from the sidebar.")
+    
+    if not st.session_state.get("authenticated"):
+        return
+    
+    main_view()
 
 
 # ✅ Run App
