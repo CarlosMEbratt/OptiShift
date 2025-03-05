@@ -1005,6 +1005,7 @@ def update_profile():
 
 # ✅ Main View (For Admins)
 
+
 def main_view():
     if not st.session_state.get("authenticated"):
         st.image("optishift_logo.png", use_container_width=True)
@@ -1013,7 +1014,7 @@ def main_view():
     st.subheader("Welcome to the workforce management system")
     st.write("Select an option below:")
 
-    user_id = st.session_state.get("user_id")  # Get logged-in user's ID
+    user_id = st.session_state.get("user_id")  # This is the document ID in "users" collection
     user_role = st.session_state.get("user_role", "employee")  # Default role is "employee"
 
     # Step 1: Fetch the Employee's Worker ID using the User's Document ID
@@ -1034,44 +1035,32 @@ def main_view():
 
         assigned_job = get_assigned_job(worker_id)  # Retrieve assigned job
 
-    # Step 3: Set Default View (Job Assignment)
-    if "selected_employee_view" not in st.session_state:
-        st.session_state["selected_employee_view"] = "assignment"  # Default to Assignment view
-
-    # Step 4: Create Buttons for View Switching
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("📄 View Assigned Job Site"):
-            st.session_state["selected_employee_view"] = "assignment"
-            st.rerun()
-    with col2:
         if st.button("📝 Update Profile"):
-            st.session_state["selected_employee_view"] = "profile"
-            st.rerun()
+            st.session_state["selected_section"] = "profile"
 
-    st.write("---")  # First horizontal line
+        st.write("---")  # First horizontal line
 
-    # Step 5: Show the Selected View
-    if user_role == "employee":
-        if st.session_state["selected_employee_view"] == "assignment":
-            if assigned_job:
-                job_site = job_sites_ref.document(assigned_job['job_site_id']).get()
-                job_site_data = job_site.to_dict() if job_site.exists else {}
+        # 🔹 **Display Job Assignment Details ONLY for Employees**
+        if assigned_job:
+            job_site = job_sites_ref.document(assigned_job['job_site_id']).get()
+            job_site_data = job_site.to_dict() if job_site.exists else {}
 
-                st.success("✅ You have been assigned to a job site!")
-                st.write(f"🕵️‍♂️ **Site Name:** {job_site_data.get('site_name', 'Unknown')}")
-                st.write(f"📍 **Address:** {job_site_data.get('address', 'Unknown')}")
-                st.write(f"👷 **Role:** {assigned_job['role']}")
-                st.write(f"📏 **Distance:** {round(assigned_job.get('distance', 0), 2)} km")
-                st.write(f"📅 **Assigned On:** {assigned_job['assigned_date'].strftime('%Y-%m-%d %H:%M')}")
-            else:
-                st.warning("⚠️ No job site assigned yet.")
-        elif st.session_state["selected_employee_view"] == "profile":
-            update_profile()  # ✅ Ensure this is called when "Update Profile" is selected
+            st.success("✅ You have been assigned to a job site!")
+            st.write(f"🏗 **Site Name:** {job_site_data.get('site_name', 'Unknown')}")
+            st.write(f"📍 **Address:** {job_site_data.get('address', 'Unknown')}")
+            st.write(f"👷 **Role:** {assigned_job['role']}")
+            st.write(f"📏 **Distance:** {round(assigned_job.get('distance', 0), 2)} km")
+            st.write(f"📅 **Assigned On:** {assigned_job['assigned_date'].strftime('%Y-%m-%d %H:%M')}")
+        else:
+            st.warning("⚠️ No job site assigned yet.")
 
-    st.write("---")  # Second horizontal line
+        st.write("---")  # Second horizontal line
 
-    # 🔹 **For Admins, Show Navigation Menu Without Blank Row**
+    # 🔹 **For Admins, Don't Show Blank Row**
+    elif user_role == "admin":
+        st.write("")  # No blank space; avoids extra empty rows
+
+    # Admin View: Show Employee, Job Site, and Assignment Options
     if user_role == "admin":
         menu_options = {
             "👥 Employees": "employees",
@@ -1082,7 +1071,7 @@ def main_view():
         if selected_option:
             st.session_state["selected_section"] = menu_options[selected_option]
 
-    # Load relevant section for Admins
+    # Load relevant section
     if st.session_state.get("selected_section") == "employees":
         st.subheader("👥 Employee Actions")
         menu = ["Add Employee", "View Employees", "Find and Update Employee"]
@@ -1124,6 +1113,7 @@ def main_view():
     if st.button("🚪 Logout"):
         st.session_state.clear()
         st.rerun()
+
 
 
 
