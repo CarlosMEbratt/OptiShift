@@ -1067,7 +1067,6 @@ def main_view():
             notify_employees()
     
     elif st.session_state.get("selected_section") == "profile":
-        st.subheader("📝 Update Your Profile")
         update_profile()
     
     st.write("---")
