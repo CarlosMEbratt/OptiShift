@@ -1068,7 +1068,7 @@ def main_view():
             else:
                 st.warning("⚠️ No job site assigned yet.")
         elif st.session_state["selected_employee_view"] == "profile":
-            update_profile()  # ✅ Ensure this is called when "Update Profile" is selected
+            update_profile(unique_key="update_profile_" + user_id)  # ✅ Ensure unique key for the form
 
     st.write("---")  # Second horizontal line
 
@@ -1118,13 +1118,14 @@ def main_view():
             notify_employees()
 
     elif st.session_state.get("selected_section") == "profile":
-        update_profile()
+        update_profile(unique_key="update_profile_admin")  # ✅ Ensure a unique key for admins
 
     st.write("---")
 
     if st.button("🚪 Logout"):
         st.session_state.clear()
         st.rerun()
+
 
 
 
