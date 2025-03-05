@@ -1005,20 +1005,20 @@ def update_profile():
 
 # ✅ Main View (For Admins)
 def main_view():
-    if not st.session_state.get("authenticated"):
-        st.image("optishift_logo.png", use_container_width=True)
-    
-    st.title("📊 OptiShift Dashboard")
-    st.subheader("Welcome to the workforce management system")
-    st.write("Select an option below:")
-    
-    # Hidden sidebar with OptiShift logo and app description
+    # Sidebar is always present but remains hidden
     with st.sidebar:
         st.image("optishift_logo.png", use_container_width=True)
         st.write("**OptiShift** helps manage workforce assignments efficiently. Use this app to:")
         st.write("- Manage employees and their assignments")
         st.write("- Organize job sites and workforce distribution")
         st.write("- View, update, and assign jobs dynamically")
+    
+    if not st.session_state.get("authenticated"):
+        st.image("optishift_logo.png", use_container_width=True)
+    
+    st.title("📊 OptiShift Dashboard")
+    st.subheader("Welcome to the workforce management system")
+    st.write("Select an option below:")
     
     user_role = st.session_state.get("user_role", "employee")
     
@@ -1082,8 +1082,10 @@ def main_view():
             notify_employees()
     
     elif st.session_state.get("selected_section") == "profile":
-        
         update_profile()
+
+
+        
 #----------------------------------------------------------------------------------------
 
 # ✅ Ensure session state is initialized
