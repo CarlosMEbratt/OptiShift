@@ -1005,7 +1005,6 @@ def update_profile():
 
 # ✅ Main View (For Admins)
 
-
 def main_view():
     if not st.session_state.get("authenticated"):
         st.image("optishift_logo.png", use_container_width=True)
@@ -1035,33 +1034,41 @@ def main_view():
 
         assigned_job = get_assigned_job(worker_id)  # Retrieve assigned job
 
-        if st.button("📝 Update your Information"):
-            st.session_state["selected_section"] = "profile"
+    # Step 3: Set Default View (Check JobSite Assignment)
+    if "selected_employee_view" not in st.session_state:
+        st.session_state["selected_employee_view"] = "assignment"  # Default to Job Assignment view
 
-        st.write("---")  # First horizontal line
+    # Step 4: Create Toggle Buttons (Side by Side)
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📄 Check JobSite Assignment"):
+            st.session_state["selected_employee_view"] = "assignment"
+            st.rerun()
+    with col2:
+        if st.button("📝 Update Your Information"):
+            st.session_state["selected_employee_view"] = "profile"
+            st.rerun()
 
-        # 🔹 **Display Job Assignment Details ONLY for Employees**
-        if assigned_job:
-            job_site = job_sites_ref.document(assigned_job['job_site_id']).get()
-            job_site_data = job_site.to_dict() if job_site.exists else {}
+    # Step 5: Show Only One Section at a Time
+    if user_role == "employee":
+        if st.session_state["selected_employee_view"] == "assignment":
+            if assigned_job:
+                job_site = job_sites_ref.document(assigned_job['job_site_id']).get()
+                job_site_data = job_site.to_dict() if job_site.exists else {}
 
-            st.success("✅ You have been assigned to a job site!")
-            st.write(f"🏗 **Site Name:** {job_site_data.get('site_name', 'Unknown')}")
-            st.write(f"📍 **Address:** {job_site_data.get('address', 'Unknown')}")
-            st.write(f"👷 **Role:** {assigned_job['role']}")
-            st.write(f"📏 **Distance:** {round(assigned_job.get('distance', 0), 2)} km")
-            st.write(f"📅 **Assigned On:** {assigned_job['assigned_date'].strftime('%Y-%m-%d %H:%M')}")
-        else:
-            st.warning("⚠️ No job site assigned yet.")
+                st.success("✅ You have been assigned to a job site!")
+                st.write(f"🏗 **Site Name:** {job_site_data.get('site_name', 'Unknown')}")
+                st.write(f"📍 **Address:** {job_site_data.get('address', 'Unknown')}")
+                st.write(f"👷 **Role:** {assigned_job['role']}")
+                st.write(f"📏 **Distance:** {round(assigned_job.get('distance', 0), 2)} km")
+                st.write(f"📅 **Assigned On:** {assigned_job['assigned_date'].strftime('%Y-%m-%d %H:%M')}")
+            else:
+                st.warning("⚠️ No job site assigned yet.")
+        elif st.session_state["selected_employee_view"] == "profile":
+            update_profile()  # ✅ Ensure update profile is displayed when selected
 
-        st.write("---")  # Second horizontal line
-
-    # 🔹 **For Admins, Don't Show Blank Row**
+    # 🔹 **For Admins, Show Navigation Menu**
     elif user_role == "admin":
-        st.write("")  # No blank space; avoids extra empty rows
-
-    # Admin View: Show Employee, Job Site, and Assignment Options
-    if user_role == "admin":
         menu_options = {
             "👥 Employees": "employees",
             "🏗️ Job Sites": "job_sites",
@@ -1071,7 +1078,7 @@ def main_view():
         if selected_option:
             st.session_state["selected_section"] = menu_options[selected_option]
 
-    # Load relevant section
+    # Load relevant section for Admins
     if st.session_state.get("selected_section") == "employees":
         st.subheader("👥 Employee Actions")
         menu = ["Add Employee", "View Employees", "Find and Update Employee"]
@@ -1107,8 +1114,6 @@ def main_view():
 
     elif st.session_state.get("selected_section") == "profile":
         update_profile()
-
-    st.write("---")
 
     if st.button("🚪 Logout"):
         st.session_state.clear()
