@@ -1004,6 +1004,7 @@ def update_profile():
 #----------------------------------------------------------------------------------------               
 
 # ✅ Main View (For Admins)
+
 def main_view():
     if not st.session_state.get("authenticated"):
         st.image("optishift_logo.png", use_container_width=True)
@@ -1016,6 +1017,7 @@ def main_view():
     user_role = st.session_state.get("user_role", "employee")  # Default role is "employee"
 
     # Only fetch assignment details for employees
+    assigned_job = None
     if user_role == "employee":
         def get_assigned_job(user_id):
             assigned_job = assignments_ref.where("employee_id", "==", user_id).stream()
@@ -1025,15 +1027,12 @@ def main_view():
 
         assigned_job = get_assigned_job(user_id)  # Retrieve assigned job
 
-    # UI for Employee Role
-    if user_role == "employee":
         if st.button("📝 Update Profile"):
             st.session_state["selected_section"] = "profile"
 
-    st.write("---")  # First horizontal line
+        st.write("---")  # First horizontal line
 
-    # 🔹 **Display Job Assignment Details ONLY for Employees**
-    if user_role == "employee":
+        # 🔹 **Display Job Assignment Details ONLY for Employees**
         if assigned_job:
             job_site = job_sites_ref.document(assigned_job['job_site_id']).get()
             job_site_data = job_site.to_dict() if job_site.exists else {}
@@ -1047,7 +1046,11 @@ def main_view():
         else:
             st.warning("⚠️ No job site assigned yet.")
 
-    st.write("---")  # Second horizontal line
+        st.write("---")  # Second horizontal line
+
+    # 🔹 **For Admins, Don't Show Blank Row**
+    elif user_role == "admin":
+        st.write("")  # No blank space; avoids extra empty rows
 
     # Admin View: Show Employee, Job Site, and Assignment Options
     if user_role == "admin":
@@ -1102,7 +1105,6 @@ def main_view():
     if st.button("🚪 Logout"):
         st.session_state.clear()
         st.rerun()
-
 
 
 
