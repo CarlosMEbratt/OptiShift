@@ -1035,7 +1035,7 @@ def main_view():
 
         assigned_job = get_assigned_job(worker_id)  # Retrieve assigned job
 
-        if st.button("📝 Update Profile"):
+        if st.button("📝 Update your Information"):
             st.session_state["selected_section"] = "profile"
 
         st.write("---")  # First horizontal line
