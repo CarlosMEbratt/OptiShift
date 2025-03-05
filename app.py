@@ -1043,9 +1043,11 @@ def main_view():
     with col1:
         if st.button("📄 View Assigned Job Site"):
             st.session_state["selected_employee_view"] = "assignment"
+            st.rerun()
     with col2:
         if st.button("📝 Update Profile"):
             st.session_state["selected_employee_view"] = "profile"
+            st.rerun()
 
     st.write("---")  # First horizontal line
 
@@ -1065,7 +1067,7 @@ def main_view():
             else:
                 st.warning("⚠️ No job site assigned yet.")
         elif st.session_state["selected_employee_view"] == "profile":
-            update_profile()
+            update_profile()  # ✅ Ensure this is called when "Update Profile" is selected
 
     st.write("---")  # Second horizontal line
 
