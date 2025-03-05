@@ -1151,12 +1151,20 @@ def authentication_ui():
 def main():
 
     # Sidebar is always present but remains hidden
+    # Sidebar is always present but remains hidden
     with st.sidebar:
         st.image("optishift_logo.png", use_container_width=True)
-        st.write("**OptiShift** helps manage workforce assignments efficiently. Use this app to:")
-        st.write("- Manage employees and their assignments")
-        st.write("- Organize job sites and workforce distribution")
-        st.write("- View, update, and assign jobs dynamically")
+        st.write("### 🚀 OptiShift: Smart Workforce Management")
+        st.write("Effortlessly assign employees to job sites using an optimized scoring system:")
+
+        st.write("- 🏆 **Role Match:** +5 pts if the employee’s role fits the job.")
+        st.write("- ⏳ **Availability Match:** +4 pts if schedules align.")
+        st.write("- 🚗 **Owns a Car:** +3 pts for easier commute.")
+        st.write("- 📍 **Close to Job Site:** +2 pts if within 40 km.")
+
+        st.write("🔹 Employees with the **highest score** are assigned first, ensuring fairness & efficiency.")
+        st.write("📊 **Automated, dynamic assignments** keep your workforce optimized in real-time!")
+
 
     authentication_ui()
     
