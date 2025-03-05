@@ -1009,7 +1009,8 @@ def main_view():
         st.image("optishift_logo.png", use_container_width=True)
     
     st.title("📊 OptiShift Dashboard")
-    st.write("Welcome to the workforce management system. Select an option below:")
+    st.subheader("Welcome to the workforce management system")
+    st.write("Select an option below:")
     
     user_role = st.session_state.get("user_role", "employee")
     
@@ -1025,8 +1026,14 @@ def main_view():
         st.session_state["selected_section"] = menu_options[selected_option]
     
     elif user_role == "employee":
-        if st.button("📝 Update Profile"):
-            st.session_state["selected_section"] = "profile"
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            if st.button("📝 Update Profile"):
+                st.session_state["selected_section"] = "profile"
+        with col2:
+            if st.button("🚪 Logout"):
+                st.session_state.clear()
+                st.rerun()
     
     st.write("---")
     
@@ -1067,12 +1074,8 @@ def main_view():
             notify_employees()
     
     elif st.session_state.get("selected_section") == "profile":
+        st.subheader("📝 Update Your Profile")
         update_profile()
-    
-    st.write("---")
-    if st.button("🚪 Logout"):
-        st.session_state.clear()
-        st.rerun()
 
 #----------------------------------------------------------------------------------------
 
