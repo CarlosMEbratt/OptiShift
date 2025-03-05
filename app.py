@@ -1005,6 +1005,7 @@ def update_profile():
 
 # ✅ Main View (For Admins)
 
+
 def main_view():
     if not st.session_state.get("authenticated"):
         st.image("optishift_logo.png", use_container_width=True)
@@ -1013,19 +1014,26 @@ def main_view():
     st.subheader("Welcome to the workforce management system")
     st.write("Select an option below:")
 
-    user_id = st.session_state.get("user_id")  # Get logged-in user's ID
+    user_id = st.session_state.get("user_id")  # This is the document ID in "users" collection
     user_role = st.session_state.get("user_role", "employee")  # Default role is "employee"
 
-    # Only fetch assignment details for employees
-    assigned_job = None
+    # Step 1: Fetch the Employee's Worker ID using the User's Document ID
+    worker_id = None
     if user_role == "employee":
-        def get_assigned_job(user_id):
-            assigned_job = assignments_ref.where("employee_id", "==", user_id).stream()
+        employee_doc = employees_ref.document(user_id).get()  # Fetch employee document
+        if employee_doc.exists:
+            worker_id = employee_doc.to_dict().get("worker_id")  # Extract worker_id
+
+    # Step 2: Fetch the Assignment using Worker ID
+    assigned_job = None
+    if worker_id:
+        def get_assigned_job(worker_id):
+            assigned_job = assignments_ref.where("employee_id", "==", worker_id).stream()
             for job in assigned_job:
                 return job.to_dict()  # Return the first found assignment
             return None  # No job assigned
 
-        assigned_job = get_assigned_job(user_id)  # Retrieve assigned job
+        assigned_job = get_assigned_job(worker_id)  # Retrieve assigned job
 
         if st.button("📝 Update Profile"):
             st.session_state["selected_section"] = "profile"
@@ -1105,6 +1113,7 @@ def main_view():
     if st.button("🚪 Logout"):
         st.session_state.clear()
         st.rerun()
+
 
 
 
