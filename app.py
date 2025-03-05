@@ -1025,14 +1025,8 @@ def main_view():
             st.session_state["selected_section"] = menu_options[selected_option]
     
     elif user_role == "employee":
-        col1, col2 = st.columns([1, 1])
-        with col1:
-            if st.button("📝 Update Profile"):
-                st.session_state["selected_section"] = "profile"
-        with col2:
-            if st.button("🚪 Logout"):
-                st.session_state.clear()
-                st.rerun()
+        if st.button("📝 Update Profile"):
+            st.session_state["selected_section"] = "profile"
     
     st.write("---")
     
@@ -1074,6 +1068,12 @@ def main_view():
     
     elif st.session_state.get("selected_section") == "profile":
         update_profile()
+    
+    st.write("---")
+    
+    if st.button("🚪 Logout"):
+        st.session_state.clear()
+        st.rerun()
 
 
 
