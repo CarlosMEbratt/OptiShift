@@ -494,6 +494,7 @@ def view_assignments():
             "Phone Number": employee_data.get("phone_number", "N/A"),
             "Home Address": employee_data.get("home_address", "N/A"),
             "Has Car": employee_data.get("have_car", "N/A"),
+            "Employee Role": ", ".join(employee_data.get("role", [])) if isinstance(employee_data.get("role"), list) else employee_data.get("role", "N/A"),
             "Required Role": assignment.get("role", "N/A"),
             "Skills": ", ".join(employee_data.get("skills", [])) if isinstance(employee_data.get("skills"), list) else "N/A",
             "Certificates": ", ".join(employee_data.get("certificates", [])) if isinstance(employee_data.get("certificates"), list) else "N/A",
@@ -505,10 +506,10 @@ def view_assignments():
     # Convert data to DataFrame
     df = pd.DataFrame(formatted_assignments)
 
-    # Define expected column order
+    # Define expected column order with "Employee Role" after "Has Car"
     column_order = [
-        "Site Name", "Company", "Address", "Num Workers", "Required Role", "Full Name", "Phone Number", 
-        "Home Address", "Has Car", "Skills", "Certificates", "Availability", "Rating", "Distance (km)"
+        "Site Name", "Company", "Address", "Num Workers", "Required Role", "Full Name", "Phone Number",
+        "Home Address", "Has Car", "Employee Role", "Skills", "Certificates", "Availability", "Rating", "Distance (km)"
     ]
     
     if not df.empty:
@@ -525,13 +526,15 @@ def view_assignments():
             df = df[
                 df["Site Name"].str.contains(search_query, case=False, na=False) |
                 df["Full Name"].str.contains(search_query, case=False, na=False) |
-                df["Role"].str.contains(search_query, case=False, na=False)
+                df["Required Role"].str.contains(search_query, case=False, na=False) |
+                df["Employee Role"].str.contains(search_query, case=False, na=False)
             ]
 
         # ✅ Display DataFrame with enhanced UI
         st.dataframe(df, use_container_width=True)
     else:
         st.info("❌ No assignments found.")
+
 
 
 #----------------------------------------------------------------------------------------
