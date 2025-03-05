@@ -1005,8 +1005,10 @@ def update_profile():
 
 # ✅ Main View (For Admins)
 def main_view():
+    if not st.session_state.get("authenticated"):
+        st.image("optishift_logo.png", use_container_width=True)
+    
     st.title("📊 OptiShift Dashboard")
-    st.image("optishift_logo.png", use_container_width=True)
     st.write("Welcome to the workforce management system. Select an option below:")
     
     user_role = st.session_state.get("user_role", "employee")
@@ -1071,6 +1073,8 @@ def main_view():
         st.session_state.clear()
         st.rerun()
 
+#----------------------------------------------------------------------------------------
+
 # ✅ Ensure session state is initialized
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
@@ -1134,9 +1138,6 @@ def authentication_ui():
                 st.rerun()
             else:
                 st.warning("⚠️ Passwords do not match. Please try again.")
-
-
-
 
 
 #----------------------------------------------------------------------------------------
