@@ -636,10 +636,10 @@ def do_assignments():
         with st.spinner("⚡ Running assignment process..."):
             try:
                 employees = [doc.to_dict() for doc in db.collection("employees").stream()]
-                
-                # ✅ Filter only active job sites
-                job_sites = [doc.to_dict() for doc in db.collection("job_sites").stream() if doc.to_dict().get("is_active", False)]
-                
+
+                # ✅ Filter only job sites where `job_status` is "active"
+                job_sites = [doc.to_dict() for doc in db.collection("job_sites").stream() if doc.to_dict().get("job_status", "").lower() == "active"]
+
                 assigned_employees = set()
 
                 if not job_sites:
@@ -714,6 +714,7 @@ def do_assignments():
 
         # ✅ Refresh UI
         view_assignments()
+
 
 
 
