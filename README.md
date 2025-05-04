@@ -1,60 +1,87 @@
 # 🧠 OptiShift: Workforce Shift Optimization Tool
 
-**OptiShift** is a Python-based scheduling tool designed to optimize shift assignments using linear programming. It ensures that workforce allocation meets operational demands while considering employee availability, preferences, and role constraints.
+**OptiShift** is a Python-based scheduling solution that leverages linear programming to generate optimized shift assignments. It uses a point-based logic system to assign the most suitable employees to shifts, balancing fairness, availability, and operational requirements.
+
+---
 
 ## 🎯 Project Objective
 
-Create an automated scheduling solution that generates optimal weekly shift plans, reducing manual effort and ensuring fair, efficient shift coverage across the team.
+Develop an automated shift scheduling tool that:
 
-## 🛠️ Technologies & Libraries
+* Assigns employees to roles based on their availability.
+* Optimizes coverage using constraint-based logic.
+* Ensures balanced workload distribution across all team members.
+
+---
+
+## 🛠️ Technologies Used
 
 * **Python**
 * **Pandas, NumPy**
 * **PuLP (Linear Programming)**
 * **Matplotlib (for visualization)**
 
-## 🔧 Features
+---
 
-* Automatically assigns shifts to employees based on availability and required coverage.
-* Ensures balanced workload distribution.
-* Flexible constraint handling (max hours per employee, coverage limits, etc.).
-* Easy-to-edit input files (CSV-based).
+## 🧮 How It Works
 
-## 🔍 How It Works
+### 🔄 Workflow Overview
 
-1. **Input Collection**
-   Users provide:
+1. **Data Input**
 
-   * Employee availability matrix
-   * Role requirements
-   * Shift coverage needs
+   * Employees provide availability for each day of the week.
+   * Each shift or time slot has required headcount and skill criteria.
+   * A CSV matrix defines the availability of each employee.
 
-2. **Linear Programming Optimization**
-   Using **PuLP**, the model minimizes total unmet shift requirements while respecting constraints.
+2. **Point-Based Assignment Logic**
 
-3. **Output**
+   * Each employee-shift combination is assigned a **score** based on:
 
-   * Optimized shift schedule in table format
-   * Visual summaries of assignments and gaps (if any)
+     * **Availability** (binary: available/unavailable).
+     * **Cumulative hours already assigned** (penalizes overloading).
+     * **Fairness constraint** (promotes balanced distribution).
+     * **Optional preferences or past assignments** (to avoid bias or repetition).
+   * The optimizer **maximizes the total points** across the schedule while satisfying:
+
+     * Minimum shift coverage.
+     * Maximum hours per employee.
+     * One shift per employee per day.
+
+3. **Linear Programming (LP) Optimization**
+
+   * The problem is modeled using the PuLP library.
+   * LP constraints ensure feasibility (e.g., availability, max shifts).
+   * Objective: **maximize total points across all assignments**.
+
+4. **Output**
+
+   * Optimized shift schedule in table format.
+   * Summary visualizations (e.g., per-employee assignments, shift coverage).
+
+---
 
 ## 📁 Repository Structure
 
 ```
-├── OptiShift.ipynb           # Main notebook with all logic, examples, and outputs
-├── data/                     # Contains sample input data (availability, shift needs)
-├── output/                   # Generated schedules (CSV/Excel)
+├── OptiShift.ipynb           # Main notebook with end-to-end implementation
+├── data/                     # Input files (employee availability, requirements)
+├── output/                   # Resulting schedules and plots
 └── README.md                 # Project documentation
 ```
 
+---
+
 ## 📈 Results
 
-* Reduced scheduling conflicts.
-* Improved coverage consistency.
-* Scalable for small and medium-sized teams.
+* Efficient coverage of all required shifts.
+* Balanced workload distribution.
+* High flexibility for adapting to different teams or work cycles.
 
-## 🚀 Future Plans
+---
 
-* Add GUI with Streamlit for non-technical users.
-* Incorporate employee preference weighting.
-* Allow for multi-week/month scheduling.
+## 🚀 Future Features
+
+* Web-based GUI (Streamlit) for easy interaction.
+* Employee preferences with scoring weights.
+* Multi-role and multi-location support.
 
